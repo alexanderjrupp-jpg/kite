@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Kite</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#6C5CE7">
 <style>
   :root {
     --bg:#E9E5F6; --bgfx:linear-gradient(160deg,#E5DFF6 0%,#EDE3F3 55%,#E1E7F6 100%);
@@ -482,16 +485,44 @@ function logWord(w){
     if (lg.length > 8000 || lg[0] && lg[0].t < cutoff){
       lg = lg.filter(function(e){ return e.t >= cutoff; }).slice(-8000);
     }
-    localStorage.setItem(LOG_KEY, JSON.stringify(lg));
+    var lj = JSON.stringify(lg);
+    localStorage.setItem(LOG_KEY, lj);
+    idbSet(LOG_KEY, lj);
   } catch(e){}
   queueUsage(w);
+}
+
+/* ---------- durable storage mirror (IndexedDB survives iOS cache cleanups) ---------- */
+var idb = null;
+function idbOpen(cb){
+  if (!window.indexedDB){ cb(null); return; }
+  try {
+    var req = indexedDB.open("kite_db", 1);
+    req.onupgradeneeded = function(){ req.result.createObjectStore("kv"); };
+    req.onsuccess = function(){ idb = req.result; cb(idb); };
+    req.onerror = function(){ cb(null); };
+  } catch(e){ cb(null); }
+}
+function idbSet(key, val){
+  if (!idb) return;
+  try { idb.transaction("kv", "readwrite").objectStore("kv").put(val, key); } catch(e){}
+}
+function idbGet(key, cb){
+  if (!idb){ cb(null); return; }
+  try {
+    var rq = idb.transaction("kv", "readonly").objectStore("kv").get(key);
+    rq.onsuccess = function(){ cb(rq.result || null); };
+    rq.onerror = function(){ cb(null); };
+  } catch(e){ cb(null); }
 }
 
 /* ---------- state ---------- */
 var board = null;
 function save(){
-  try { localStorage.setItem(LS_KEY, JSON.stringify(board)); }
+  var j = JSON.stringify(board);
+  try { localStorage.setItem(LS_KEY, j); }
   catch(e){ toast("Storage is full — export a backup, then remove some photos."); }
+  idbSet(LS_KEY, j);
   schedulePush();
 }
 function load(){
@@ -511,6 +542,7 @@ function ensureShape(){
   if (board.settings.vol === undefined) board.settings.vol = 1;
   if (board.settings.volMax === undefined) board.settings.volMax = 1;
   if (board.settings.volMin === undefined) board.settings.volMin = 0.15;
+  if (!board.settings.kbLayout) board.settings.kbLayout = "qwerty";
   if (!board.fspFix){
     Object.keys(board.pages).forEach(function(pk){
       var cs = board.pages[pk].cells;
@@ -818,6 +850,26 @@ function drawSpell(){
     keys = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">' +
       PUNCT.map(function(p){ return key(p[0], p[0]); }).join("") + '</div>' +
       '<div class="note">Punctuation changes how the sentence sounds — a ? makes it a question.</div>';
+  } else if (board.settings.kbLayout === "abc"){
+    var seq = [];
+    "abcdefghijklmnopqrstuvwxyz".split("").forEach(function(ch){
+      seq.push([ch, ch]);
+      if (spellMode === "phon"){
+        for (var li = 0; li < LONGV.length; li++){
+          if (LONGV[li][0].normalize("NFD")[0] === ch) seq.push([LONGV[li][0], "LV:" + LONGV[li][1]]);
+        }
+      }
+    });
+    keys = '<div style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:5px">' +
+      seq.map(function(p){
+        var hint = "";
+        if (spellMode === "phon"){
+          var h = p[1].indexOf("LV:") === 0 ? p[1].slice(3) : (PHON[p[0]] || "");
+          hint = '<div style="font-size:9px;color:var(--muted);font-weight:600">' + h + '</div>';
+        }
+        return '<button class="spk2" data-v="' + p[1] + '" style="max-width:52px;min-width:40px"><div>' + p[0] + '</div>' + hint + '</button>';
+      }).join("") + '</div>';
+    if (spellMode === "phon") keys += '<div class="note">ABC order — every key shows its sound, and marked vowels (ā ē ī ō ū) sit next to their letter.</div>';
   } else {
     var qrows = ["qwertyuiop","asdfghjkl","zxcvbnm"];
     keys = qrows.map(function(r, i){
@@ -830,7 +882,7 @@ function drawSpell(){
         '<div class="note">Letters make their sounds. Top-marked vowels say their long sound.</div>';
     }
   }
-  openOv('<h3>🔤 Keyboard</h3>' +
+  openOv('<h3>🔤 Keyboard <button id="kblay" style="float:right;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer">' + (board.settings.kbLayout === "abc" ? "ABC → QWERTY" : "QWERTY → ABC") + '</button></h3>' +
     '<div id="spbuf" style="min-height:42px;font-size:24px;letter-spacing:1px;text-align:center;border:1px solid var(--border);border-radius:12px;padding:7px">'+esc(spellBuf)+'</div>' +
     '<div class="tabs" id="sptabs">'+tabHtml+'</div>' +
     '<div id="spkeys">'+keys+'</div>' +
@@ -841,6 +893,10 @@ function drawSpell(){
     '<div class="btnrow"><button class="btn" id="spc">Cancel</button><button class="btn primary" id="spok">OK — say it</button></div>');
   Array.prototype.forEach.call(ovbox.querySelectorAll("#sptabs button"), function(bt){
     bt.addEventListener("click", function(){ spellMode = bt.getAttribute("data-m"); drawSpell(); });
+  });
+  ovbox.querySelector("#kblay").addEventListener("click", function(){
+    board.settings.kbLayout = board.settings.kbLayout === "abc" ? "qwerty" : "abc";
+    save(); drawSpell();
   });
   function upd(){ ovbox.querySelector("#spbuf").textContent = spellBuf; }
   Array.prototype.forEach.call(ovbox.querySelectorAll(".spk2"), function(bt){
@@ -1286,7 +1342,11 @@ function loadDev(){
   if (!dev.theme) dev.theme = "light";
   saveDev();
 }
-function saveDev(){ try { localStorage.setItem(DEV_KEY, JSON.stringify(dev)); } catch(e){} }
+function saveDev(){
+  var j = JSON.stringify(dev);
+  try { localStorage.setItem(DEV_KEY, j); } catch(e){}
+  idbSet(DEV_KEY, j);
+}
 function applyTheme(){
   document.body.classList.toggle("dark", dev.theme === "dark");
   var tb = document.getElementById("themeBtn");
@@ -2112,6 +2172,64 @@ function gameRound(){
   });
 }
 
+/* ---------- Model With Me: routine coach ---------- */
+var ROUTINES = [
+  { n:"Bedtime", e:"🌙", w:["tired","read","more","goodnight"], p:"read more",
+    t:"While tucking in, tap read and say it. Read a page, then model \u201cread more?\u201d and wait." },
+  { n:"Snack time", e:"🍎", w:["eat","more","want","finished"], p:"want more",
+    t:"Hold the snack, model \u201ceat\u201d. Give a little. Model \u201cmore?\u201d before handing over more. Tap finished at the end." },
+  { n:"Mealtime", e:"🍽️", w:["eat","drink","more","finished"], p:"more drink",
+    t:"Narrate the meal: \u201ceat\u201d, \u201cdrink\u201d. Offer two choices and model both words before he picks." },
+  { n:"Bath time", e:"🛁", w:["water","in","help","finished"], p:"in water",
+    t:"Model \u201cin\u201d as each toy goes in the tub. Splash and comment \u2014 bath talk is play, not testing." },
+  { n:"Car ride", e:"🚗", w:["go","stop","fast","look"], p:"go fast",
+    t:"Model \u201cgo\u201d when the light changes, \u201cstop\u201d at stop signs. Point out the window and tap look." },
+  { n:"Playground", e:"🌳", w:["play","up","down","more"], p:"up more",
+    t:"Model \u201cup\u201d as the swing rises, \u201cdown\u201d on the slide. One word per push \u2014 rhythm builds words." },
+  { n:"School pickup", e:"🎒", w:["happy","school","what","do"], p:"what do",
+    t:"Instead of quizzing \u201cwhat did you do?\u201d, model your own day: \u201cI do work. I happy.\u201d Then wait." },
+  { n:"Morning", e:"🌞", w:["up","wear","eat","go"], p:"wear this",
+    t:"Model \u201cup\u201d at wake-up, \u201cwear\u201d while offering two shirts, \u201cgo\u201d heading out the door." },
+  { n:"Feelings check", e:"🎭", w:["feel","happy","sad","mad"], p:"I feel happy",
+    t:"Model YOUR feelings first: \u201cI feel tired.\u201d Kids learn feeling words by hearing them used honestly." },
+  { n:"Play time", e:"🎲", w:["play","want","more","stop"], p:"play more",
+    t:"Follow his lead. Model \u201cmore\u201d before restarting a game he loves. Model \u201cstop\u201d and actually stop \u2014 words must have power." }
+];
+function openCoach(){
+  var chips = ROUTINES.map(function(r, i){
+    return '<button class="btn ghost rch" data-i="'+i+'" style="flex:0 0 auto;padding:10px 12px;font-size:14px">'+r.e+' '+esc(r.n)+'</button>';
+  }).join("");
+  openOv('<h3>🧭 Model With Me</h3><p class="sub">Pick a routine — you get 3\u20134 words to model and a simple script. Modeling means YOU tap and talk. No quizzing, no pressure.</p>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px">'+chips+'</div>' +
+    '<div class="btnrow"><button class="btn" id="cc">Close</button></div>');
+  Array.prototype.forEach.call(ovbox.querySelectorAll(".rch"), function(bt){
+    bt.addEventListener("click", function(){ coachDetail(ROUTINES[parseInt(bt.getAttribute("data-i"),10)]); });
+  });
+  ovbox.querySelector("#cc").addEventListener("click", openSettings);
+}
+function coachDetail(r){
+  var ix = wordIndex();
+  var chips = r.w.map(function(w){
+    var b = ix[w.toLowerCase()];
+    if (b){
+      var pc = palColors(b.c);
+      return '<button class="cw" data-w="'+esc(b.l)+'" style="border:none;border-radius:12px;padding:10px 14px;font-size:16px;font-weight:700;cursor:pointer;color:var(--text);background:'+pc[0]+';box-shadow:0 2px 0 '+pc[1]+'">'+(b.e && b.e !== "⬜" ? b.e+" " : "")+esc(w)+'</button>';
+    }
+    return '<span style="padding:10px 14px;font-size:15px;color:var(--muted);border:1.5px dashed var(--border);border-radius:12px">'+esc(w)+' <span style="font-size:10px">(not on the board yet)</span></span>';
+  }).join("");
+  openOv('<h3>'+r.e+' '+esc(r.n)+'</h3>' +
+    '<label>Model these words — tap one to see its path on the board</label>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0">'+chips+'</div>' +
+    '<label>Try this</label><div style="font-size:15px;background:var(--tipbg);border:1px solid var(--tipborder);border-radius:12px;padding:10px 12px">'+esc(r.t)+'</div>' +
+    '<label>Say together</label><div style="font-size:20px;font-weight:800;color:var(--accent);text-align:center;padding:6px">\u201c'+esc(r.p)+'\u201d</div>' +
+    '<div class="note">Golden rules: model without expecting anything back \u00b7 wait 10 seconds \u00b7 respond to every tap like it\u2019s talking \u2014 because it is.</div>' +
+    '<div class="btnrow"><button class="btn" id="cb">\u2190 Routines</button></div>');
+  Array.prototype.forEach.call(ovbox.querySelectorAll(".cw"), function(bt){
+    bt.addEventListener("click", function(){ closeOv(); startWordGuide(bt.getAttribute("data-w")); });
+  });
+  ovbox.querySelector("#cb").addEventListener("click", openCoach);
+}
+
 /* ---------- settings ---------- */
 document.getElementById("setBtn").addEventListener("click", function(){
   askPin(openSettings);
@@ -2126,6 +2244,7 @@ function openSettings(){
     '<div style="background:var(--tipbg);border:1px solid var(--tipborder);border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:6px"><b>💡 Today’s idea:</b> '+esc(todayTip())+'</div>' +
     '<button class="btn ghost" id="rep" style="width:100%;margin-top:6px">📊 Weekly report &amp; target words</button>' +
     '<button class="btn ghost" id="syncb" style="width:100%;margin-top:6px">☁ Phone sync '+(syncOn ? "· connected ✓" : "· set up")+'</button>' +
+    '<button class="btn ghost" id="coachb" style="width:100%;margin-top:6px">🧭 Model With Me — routine coach</button>' +
     '<label>Voice</label><select id="vv">'+vopts+'</select>' +
     '<div class="note">Tip: on iPad, download a free “Enhanced” voice in Settings → Accessibility → Spoken Content → Voices for a much more natural child voice — it will appear in this list.</div>' +
     '<label>Voice pitch: <span id="pvv">'+board.settings.pitch.toFixed(1)+'</span> (higher = younger)</label>' +
@@ -2157,6 +2276,7 @@ function openSettings(){
     '<div class="btnrow"><button class="btn primary" id="sd">Done</button></div>');
   ovbox.querySelector("#rep").addEventListener("click", openReport);
   ovbox.querySelector("#syncb").addEventListener("click", openSyncDlg);
+  ovbox.querySelector("#coachb").addEventListener("click", openCoach);
   ovbox.querySelector("#vv").addEventListener("change", function(){ board.settings.voice = this.value; save(); });
   ovbox.querySelector("#sp").addEventListener("input", function(){ board.settings.pitch = parseFloat(this.value); ovbox.querySelector("#pvv").textContent = board.settings.pitch.toFixed(1); save(); });
   ovbox.querySelector("#sr").addEventListener("input", function(){ board.settings.rate = parseFloat(this.value); ovbox.querySelector("#rvv").textContent = board.settings.rate.toFixed(1); save(); });
@@ -2217,20 +2337,42 @@ document.getElementById("importIn").addEventListener("change", function(){
   fr.readAsText(f);
 });
 
-/* ---------- init ---------- */
-loadDev();
-applyTheme();
-load();
-ensureShape();
-renderSent();
-render();
-if (dev.fb && dev.code){
-  setStatus("Connecting…");
-  initFirebase(function(err){
-    if (err){ setStatus("Sync offline — device still works"); return; }
-    syncOn = true; startListen(); setStatus("Synced ✓");
-  });
+/* ---------- init: open durable store, restore if needed, then start ---------- */
+function startApp(){
+  loadDev();
+  applyTheme();
+  load();
+  ensureShape();
+  renderSent();
+  render();
+  if (dev.fb && dev.code){
+    setStatus("Connecting…");
+    initFirebase(function(err){
+      if (err){ setStatus("Sync offline — device still works"); return; }
+      syncOn = true; startListen(); setStatus("Synced ✓");
+    });
+  }
+  if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
+    try { navigator.serviceWorker.register("sw.js").catch(function(){}); } catch(e){}
+  }
 }
+idbOpen(function(){
+  var rawBoard = null;
+  try { rawBoard = localStorage.getItem(LS_KEY); } catch(e){}
+  if (rawBoard){ startApp(); return; }
+  /* primary storage is empty — restore everything from the durable mirror */
+  idbGet(LS_KEY, function(vb){
+    if (vb){ try { localStorage.setItem(LS_KEY, vb); } catch(e){} }
+    idbGet(DEV_KEY, function(vd){
+      if (vd){ try { if (!localStorage.getItem(DEV_KEY)) localStorage.setItem(DEV_KEY, vd); } catch(e){} }
+      idbGet(LOG_KEY, function(vl){
+        if (vl){ try { if (!localStorage.getItem(LOG_KEY)) localStorage.setItem(LOG_KEY, vl); } catch(e){} }
+        startApp();
+        if (vb) toast("Board restored from backup storage ✓");
+      });
+    });
+  });
+});
 })();
 </script>
 </body>
