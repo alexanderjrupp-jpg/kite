@@ -36,6 +36,20 @@
     --ambient:0 3px 10px rgba(0,0,0,.35);
     --kitetail:#8DA2F2;
   }
+  body.hc {
+    --bg:#ffffff; --bgfx:none; --panel:#ffffff; --border:#000000; --soft:#e6e6e6;
+    --text:#000000; --muted:#000000; --accent:#0000cc; --accent2:#a00050; --accent3:#006b5e;
+    --accsoft:#d9d9ff;
+    --sentbg:#ffffff; --sentborder:#000000; --tipbg:#ffffff; --tipborder:#000000;
+    --good:#006b00; --bad:#a00000; --chip:#ffffff; --empty:#ffffff; --emptyedit:#000000;
+    --shadow:none; --surface:#ffffff; --surfborder:#000000; --glass:#ffffff;
+    --ambient:none; --kitetail:#000000;
+  }
+  body.hc #gridwrap { background:#ffffff; }
+  body.hc .cell { outline:3px solid #000; outline-offset:-3px; border-radius:14px; }
+  body.hc .cell .lab { color:#000; font-weight:800; }
+  body.hc .cell .foldmark, body.hc .cell .editmark { color:#000; }
+  body.hc #sent .chip { border:2px solid #000; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin:0; padding:0; height:100%; overflow:hidden;
     font-family:ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -184,6 +198,7 @@
     <button id="pbuild" style="display:none">🪄 Page builder</button>
     <button id="storiesBtn">📖 Stories</button>
     <button id="gameBtn">🎲 Play</button>
+    <button id="routBtn">🧭 Routines</button>
     <div style="flex:1"></div>
     <span id="syncst" style="font-size:11px;color:var(--good);margin-right:8px"></span>
     <div style="font-size:11px;color:var(--muted)">Symbols © ARASAAC (CC BY-NC-SA), Gov. of Aragón</div>
@@ -251,163 +266,27 @@ function stubPage(name){
   return page(name, rows);
 }
 
-/* ---------- his board (transcribed from LAMP photos) ---------- */
-function hisBoard(){
-  var _ = null;
-  var home = page("Home", [
-    [ W("finished","✔️"), W("mine","🙋"), W("little","🤏"), W("up","⬆️"), W("yes","👍"), W("good","😊"), W("some","✨"), W("no","👎"), W("down","⬇️"), W("out","🚪"), W("off","📴"), W("bad","😞") ],
-    [ W("me","👈","y"), W("my","🏷️","y"), W("wear","👕"), W("am","🐝","g"), W("please","🙏"), F("family","👨‍👩‍👧‍👦","family","o"), W("and","🚂"), W("in","🌉"), W("what","❓"), W("a","🅰️","o"), G("+s","s","o"), W("there","📍","b") ],
-    [ W("I","🙋","y"), W("we","👨‍👩‍👧","y"), W("are","🚶","g"), W("is","🪣","g"), F("Animals","🐾","animals","w",false), W("was","💦","g"), W("on","🟢","g"), W("to","➡️","g"), SPELL(), W("an","🖌️","b"), W("the","🖌️","b"), W("end","🏁") ],
-    [ W("you","👉","y"), W("they","👥","y"), W("new","🎓"), W("play","🎲"), W("like","☀️"), W("work","🔨"), W("have","💰"), F("feel","🎭","feelings","w"), W("read","📖"), W("more","➕"), W("fast","👟"), W("stop","🛑") ],
-    [ W("it","🐑","y"), W("he","👦","y"), W("want","🤲"), W("all","👨‍👩‍👧‍👦"), W("come","🐕"), W("time","⏰"), W("do","👆"), W("go","🚦"), W("get","🎁"), W("big","🐘"), W("color","🌈"), W("help","🛟") ],
-    [ W("she","👧","y"), W("look","👀"), W("slow","🐌"), W("hear","👂"), F("eat","🍎","food","w"), W("right","⏩"), W("said","📱"), W("live","🏠"), W("love","❤️"), W("follow","👣"), W("ride","🚚"), W("put","📦") ],
-    [ CLEAR(), W("not","🚫"), W("talk","💬"), W("sit","🪑"), W("think","🤔"), W("find","🔍"), W("make","🧱"), W("need","☂️"), W("drink","🧃"), F("watch","📺","tv","w"), W("turn","🔄"), W("sleep","🛏️") ]
-  ]);
-  var family = page("Family", [
-    [ BACK(), W("Jesus","✝️"), W("Heavenly","😇"), _, W("mom","👩","g"), _, W("dad","👨","g"), _, _, W("Beau","👶","g"), _, W("Mimi","👵","y") ],
-    [ W("Sam","🙂","o"), W("Chris","🙂","p"), W("Katie","🙂","pu"), W("Nick","🙂","pu"), W("Clay","🙂","pu"), W("Nora","🙂","pu"), _, W("Ellen","🙂","b"), W("Skylar","🙂","b"), W("Daphne","🙂","b"), W("Andrew","🙂","b"), W("William","🙂","b") ],
-    [ W("Ellanore","🙂","o"), W("Faith","🙂"), W("Kim","🙂","t"), W("Adam","🙂","t"), W("Taylor","🙂","t"), W("Logan","🙂","t"), _, _, _, W("Grandpa","👴"), _, W("Grandma","👵","y") ],
-    [ W("Jose","🙂","r"), W("Chantelle","🙂","p"), W("Jeremy","🙂","p"), _, W("Elias","👶"), W("Tasia","🙂"), W("Andre","🙂"), W("Amaya","🧒"), _, W("Nana D","👵"), W("Pappa","👴"), _ ],
-    [ F("School","🏫","school","o",false), _, _, _, _, _, _, _, _, _, _, W("family","👨‍👩‍👧‍👦","o") ],
-    [ _, _, _, W("brother","👦"), _, W("Quinn","🧒","g"), _, _, _, _, _, _ ],
-    [ CLEAR(), _, _, W("let","🤝","g"), W("kind","💗","b"), _, W("all right","👌"), W("short","📏","b"), _, _, _, _ ]
-  ]);
-  var feelings = page("Feelings", [
-    [ BACK(), _, _, W("sick","🤒"), _, _, W("mad","😠"), _, _, W("silly","🤪"), _, _ ],
-    [ _, _, _, _, W("happy","😊"), _, _, _, _, _, _, _ ],
-    [ _, _, W("feel","🎭","g"), _, _, _, _, _, W("sad","😢","b"), _, _, _ ],
-    [],
-    [ _, _, W("scare","👻","g"), _, W("afraid","😱"), _, _, _, _, _, _, _ ],
-    [],
-    [ CLEAR(), _, _, _, W("angry","😡","b"), _, _, _, _, _, _, _ ]
-  ]);
-  var food = page("Food", [
-    [ BACK(), F("Asian","🍜","cat_asian","b",false), F("Condiments","🧂","cat_cond","b",false), F("Dairy","🧀","cat_dairy","b",false), F("Fruit","🍉","fruit","b",false), F("Italian","🍝","cat_ital","b",false), F("Meals","🍽️","cat_meals","b",false), F("Meat/Seafood","🍖","cat_meat","b",false), F("Mexican","🌮","cat_mex","b",false), F("Snacks/Desserts","🍪","cat_snacks","b",false), F("Vegetables","🌽","cat_veg","b",false), _ ],
-    [],
-    [ _, _, W("eat","🍎","g"), _, _, _, _, _, W("hungry","😋","b","I'm hungry"), _, _, _ ],
-    [],
-    [ _, _, _, _, _, _, _, _, _, W("smell","👃","g"), _, _ ],
-    [],
-    [ CLEAR() ]
-  ]);
-  var fruit = page("Fruit", [
-    [ BACK(), W("fruit","🍉","o"), _, W("apple","🍎"), _, W("banana","🍌"), _, W("grapes","🍇"), _, W("melon","🍈"), _, _ ],
-    [],
-    [ _, _, W("strawberry","🍓"), _, _, _, W("blueberry","🫐"), _, W("orange","🍊"), _, _, _ ],
-    [],
-    [ _, W("pineapple","🍍"), _, _, _, W("pumpkin","🎃"), _, W("kiwi","🥝"), _, W("tomato","🍅"), _, W("avocado","🥑") ],
-    [ _, _, W("raspberry","🍓"), _, _, _, _, _, _, _, _, _ ],
-    [ CLEAR(), _, _, _, _, _, W("lemon","🍋"), _, _, _, _, _ ]
-  ]);
-  var school = page("School", [
-    [ BACK(), W("mine","✍️"), _, W("Peaches","🙂"), _, W("Benice","🙂"), _, W("Rachel","🙂"), _, W("Kelsey","🙂"), _, _ ],
-    [],
-    [ _, W("Furr","🙂"), _, _, W("Moore","🙂"), _, W("Jessey","🙂"), _, W("Chasey","🙂"), _, W("Keiger","🙂"), _ ],
-    [ _, _, _, W("Campbell","🙂"), _, W("Bost","🙂"), _, W("hartsell","🙂"), _, W("Almond","🙂"), _, _ ],
-    [ _, W("Miss","🙂"), _, W("Miss","🙂"), _, _, _, W("Amanda","🤸"), _, _, _, _ ],
-    [ _, _, _, _, _, W("Wheatley","👩‍🏫"), _, _, W("Faith","🙂"), _, W("Ally","🙂"), _ ],
-    [ CLEAR(), _, W("Cookie","🚌"), _, W("Sandy","🚌"), _, _, _, _, _, _, _ ]
-  ]);
-  var animals = page("Animals", [
-    [ BACK(), F("Pet/Farm","🐕","an_pets","b",false), F("Zoo","🦁","an_zoo","b",false), F("Insects","🐜","an_insects","b",false), F("Birds","🐦","an_birds","b",false), F("Water","🐟","an_water","b",false), F("Baby","🐣","an_baby","b",false), F("Woods","🦌","an_woods","b",false), F("Dino","🦖","an_dino","b",false), _, F("Homes","🏡","an_homes","b",false), _ ],
-    [],
-    [ _, _, W("come","🐕","g"), _, _, _, _, _, _, _, _, _ ],
-    [],
-    [ _, _, _, _, _, _, _, _, W("stink","🦨","g"), _, _, _ ],
-    [],
-    [ CLEAR() ]
-  ]);
-  var an_pets = page("Pets & Farm", [
-    [ BACK(), _, _, W("dog","🐕"), _, W("cat","🐈"), W("Daisy","🐱"), _, W("mouse","🐭"), _, W("gerbil","🐹"), _ ],
-    [ _, _, _, W("bark","🐶","g"), _, W("meow","😺","g"), W("Maggie","🐱"), _, W("guinea pig","🐹"), _, _, _ ],
-    [ _, _, _, _, _, _, _, _, _, W("goat","🐐"), _, _ ],
-    [ W("hen","🐔"), _, W("rooster","🐓"), _, W("cow","🐄"), _, W("horse","🐴"), _, W("sheep","🐑"), _, W("pig","🐷"), _ ],
-    [ W("cluck","🐔","g"), _, W("cockadoo","🐓","g"), _, W("moo","🐮","g"), _, W("neigh","🐎","g"), _, W("baa","🐑","g"), _, W("oink","🐽","g"), _ ],
-    [],
-    [ CLEAR() ]
-  ]);
-  var an_zoo = page("Zoo Animals", [
-    [ BACK(), _, W("bear","🐻"), _, W("elephant","🐘"), _, W("giraffe","🦒"), _, W("lion","🦁"), _, W("monkey","🐒"), _ ],
-    [],
-    [ W("tiger","🐯"), _, W("zebra","🦓"), _, W("hippopotamus","🦛"), _, W("camel","🐫"), _, W("gorilla","🦍"), _, W("kangaroo","🦘"), _ ],
-    [], [], [],
-    [ CLEAR() ]
-  ]);
-  var tv = page("TV & Movies", [
-    [ BACK(), _, _, _, W("movie","🎬","o"), _, _, _, _, _, _, _ ],
-    [ _, W("Tangled","👸"), _, W("Moana","🌊"), _, W("Coco","🎸"), _, W("Encanto","🦋"), _, W("Frozen","❄️"), _, W("Wish","⭐") ],
-    [ _, _, W("watch","⌚","g"), _, _, _, _, _, _, _, W("Jeopardy","❓"), _ ],
-    [ _, _, _, _, W("TV","📺","o"), _, _, _, _, _, _, _ ],
-    [ _, W("Daniel Tiger","🐯"), _, W("Trash Truck","🚛"), _, W("Pete the Cat","🐱"), _, W("Dinosaur Train","🦖"), _, W("Bluey","🐶"), _, W("Word World","🌍") ],
-    [ _, _, W("Caitie","🏫"), _, W("Sarah","🎤"), _, W("Ms Rachel","🎵"), _, W("Jacqui","🎶"), _, W("Super Simple","🎼"), _ ],
-    [ CLEAR(), _, _, _, _, _, _, _, _, _, _, W("YouTube","▶️") ]
-  ]);
-  var cat_cond = page("Condiments", [
-    [ BACK(), _, _, W("ketchup","🥫"), _, _, _, _, _, _, _, W("peanut butter","🥜") ],
-    [],
-    [ W("jelly","🍇"), _, _, _, _, _, _, _, _, _, _, _ ],
-    [],
-    [ _, _, _, W("pickle","🥒"), _, _, _, _, _, _, _, _ ],
-    [],
-    [ CLEAR() ]
-  ]);
-  var cat_dairy = page("Dairy", [
-    [ BACK(), _, _, W("cheese","🧀"), _, W("yogurt","🥣"), _, W("egg","🥚"), _, _, _, _ ],
-    [], [], [], [], [],
-    [ CLEAR() ]
-  ]);
-  var cat_ital = page("Italian", [
-    [ BACK(), W("pasta","🍝","o"), _, _, _, W("ravioli","🥟"), _, W("pizza","🍕"), _, W("spaghetti","🍝"), _, _ ],
-    [], [], [],
-    [ _, _, _, W("lasagna","🥘"), _, _, _, _, _, _, _, _ ],
-    [],
-    [ CLEAR() ]
-  ]);
-  var cat_meals = page("Meals", [
-    [ BACK(), _, _, _, _, _, _, _, _, W("picnic","🧺"), _, _ ],
-    [ W("breakfast","🍳","o"), _, W("oatmeal","🥣"), _, _, _, W("pancake","🥞"), _, W("waffle","🧇"), _, W("bread","🍞"), _ ],
-    [ _, W("doughnut","🍩"), _, W("muffin","🧁"), _, W("French toast","🍞"), _, _, _, W("Cheerios","🥣"), _, _ ],
-    [ W("lunch","🥪","o"), _, W("sandwich","🥪"), _, W("macaroni","🍜"), _, W("salad","🥗"), _, W("grilled cheese","🥪"), _, W("French fries","🍟"), _ ],
-    [ _, W("soup","🍲"), _, W("chicken","🍗"), _, _, _, W("cheese","🧀"), _, _, _, _ ],
-    [ W("dinner","🍽️","o"), _, W("meat balls","🧆"), _, _, _, _, _, _, _, _, _ ],
-    [ CLEAR() ]
-  ]);
-  return {
-    version: 3,
-    template: "his",
-    pin: "1234",
-    settings: { voice:"", rate:1.0, pitch:1.0, instant:true },
-    pages: {
-      home: home, family: family, feelings: feelings, food: food, fruit: fruit,
-      school: school, animals: animals, an_pets: an_pets, an_zoo: an_zoo, tv: tv,
-      cat_cond: cat_cond, cat_dairy: cat_dairy, cat_ital: cat_ital, cat_meals: cat_meals,
-      an_insects: stubPage("Insects"), an_birds: stubPage("Birds"), an_water: stubPage("Water Animals"),
-      an_baby: stubPage("Baby Animals"), an_woods: stubPage("Woods Animals"), an_dino: stubPage("Dinosaurs"),
-      an_homes: stubPage("Animal Homes"),
-      cat_asian: stubPage("Asian"), cat_meat: stubPage("Meat/Seafood"),
-      cat_mex: stubPage("Mexican"), cat_snacks: stubPage("Snacks & Desserts"), cat_veg: stubPage("Vegetables")
-    }
-  };
-}
-
 /* ---------- clean starter board (for sharing with other families) ---------- */
 function starterBoard(){
   var _ = null;
   var home = page("Home", [
-    [ W("I","🙋","y"), W("want","🤲","g"), W("more","➕"), W("help","🛟","g","help me"), W("yes","👍"), W("no","👎"), _, _, _, _, _, _ ],
-    [ W("you","👉","y"), W("go","🚦","g"), W("stop","🛑"), W("like","☀️","g"), W("all done","✔️"), W("my turn","🙋"), _, _, _, _, _, _ ],
-    [],
-    [ F("Food","🍎","s_food","o"), F("Drinks","🧃","s_drinks","o"), F("Feelings","🎭","s_feel","o"), F("People","👨‍👩‍👧","s_people","o"), F("Play","🎲","s_play","o"), F("Places","🏠","s_places","o"), _, _, _, _, _, _ ],
-    [],
-    [],
-    [ CLEAR(), _, _, _, _, _, _, _, _, _, _, SPELL() ]
+    [ W("I","🙋","y"), W("you","👉","y"), W("it","👇","y"), W("want","🤲","g"), W("go","🚦","g"), W("stop","🛑","r"), W("more","➕","b"), W("help","🛟","g"), W("like","👍","g"), W("not","🚫","r"), W("yes","✅","p"), W("no","👎","r") ],
+    [ W("we","👨‍👩‍👧","y"), W("he","👦","y"), W("she","👧","y"), W("they","👪","y"), W("get","🫴","g"), W("put","📥","g"), W("make","🔨","g"), W("do","⚙️","g"), W("have","🤝","g"), W("turn","🔄","g"), W("all done","🏁","b"), W("mine","🙋","y") ],
+    [ W("this","☝️","w"), W("that","👉","w"), W("look","👀","g"), W("come","🙋","g"), W("give","🎁","g"), W("open","📂","g"), W("eat","🍽️","g"), W("drink","🥤","g"), W("play","🎲","g"), W("see","👁️","g"), W("need","❗","g"), W("feel","💗","g") ],
+    [ W("a","🅰️","w"), W("the","📄","w"), W("some","✨","b"), W("big","🔵","b"), W("little","🔹","b"), W("good","😊","b"), W("bad","😞","b"), W("hot","🔥","b"), W("cold","❄️","b"), W("fast","💨","b"), W("here","📍","w"), W("there","📌","w") ],
+    [ W("and","🔗","w"), W("to","➡️","w"), W("in","📥","w"), W("on","🔛","w"), W("up","⬆️","w"), W("down","⬇️","w"), W("what","❓","pu"), W("where","📍","pu"), W("who","🧑","pu"), W("why","🤔","pu"), W("when","⏰","pu"), W("how","🔧","pu") ],
+    [ F("Food","🍎","s_food","o"), F("Drinks","🧃","s_drinks","o"), F("People","👪","s_people","o"), F("Feelings","🎭","s_feel","o"), F("Body","🧍","s_body","o"), F("Clothes","👕","s_clothes","o"), F("Places","🏠","s_places","o"), F("Play","🎲","s_play","o"), F("Animals","🐾","s_animals","o"), F("School","🏫","s_school","o"), F("Describing","🔵","s_desc","o"), F("More","➕","s_more","o") ],
+    [ CLEAR(), G("+s","s","g"), G("+ing","ing","g"), G("+ed","ed","g"), G("+er","er","b"), G("+est","est","b"), W("hi","👋","p"), W("bye","👋","p"), W("please","🙏","p"), W("thank you","🤗","p"), W("sorry","😔","p"), SPELL() ]
   ]);
-  function sp(name, words){
-    var rows = [[BACK()],[],[],[],[],[],[CLEAR()]];
-    var r=1,c=0;
-    for (var i=0;i<words.length;i++){
-      rows[r][c]=words[i]; c+=2; if (c>=COLS){ c=0; r+=2; }
+  function sp(name, items){
+    var rows = [[BACK()],[],[],[],[],[],[]];
+    var r=1, c=0;
+    for (var i=0;i<items.length;i++){
+      if (!rows[r]) rows[r]=[];
+      rows[r][c]=items[i];
+      c++; if (c>=COLS){ c=0; r++; if (r>5) break; }
     }
+    rows[6][COLS-1]=CLEAR();
     return page(name, rows);
   }
   return {
@@ -415,12 +294,26 @@ function starterBoard(){
     settings: { voice:"", rate:1.0, pitch:1.0, instant:true },
     pages: {
       home: home,
-      s_food: sp("Food",[W("apple","🍎"),W("banana","🍌"),W("cracker","🍘"),W("cheese","🧀"),W("pizza","🍕"),W("hungry","😋","w","I'm hungry")]),
-      s_drinks: sp("Drinks",[W("water","💧"),W("milk","🥛"),W("juice","🧃"),W("thirsty","🥤","w","I'm thirsty")]),
-      s_feel: sp("Feelings",[W("happy","😊"),W("sad","😢"),W("mad","😠"),W("scared","😱"),W("tired","🥱"),W("silly","🤪")]),
-      s_people: sp("People",[W("mom","👩"),W("dad","👨"),W("me","👈"),W("friend","🧑‍🤝‍🧑")]),
-      s_play: sp("Play",[W("ball","⚽"),W("blocks","🧱"),W("book","📖"),W("outside","🌳"),W("music","🎵")]),
-      s_places: sp("Places",[W("home","🏠"),W("school","🏫"),W("park","🌳"),W("bathroom","🚽"),W("car","🚗")])
+      s_food: sp("Food",[ W("apple","🍎"), W("banana","🍌"), W("cracker","🍘"), W("cheese","🧀"), W("bread","🍞"), W("cookie","🍪"), W("cereal","🥣"), W("yogurt","🥛"), W("chicken","🍗"), W("rice","🍚"), W("pasta","🍝"), W("egg","🥚"), W("fruit","🍓"), W("vegetable","🥦"), W("snack","🍿"), W("sandwich","🥪"), W("eat","🍽️","g"), W("want","🤲","g"), W("more","➕","b"), W("all done","🏁","b"), W("yummy","😋","b"), W("yucky","🤢","b"), W("hungry","😫","b") ]),
+      s_drinks: sp("Drinks",[ W("water","💧"), W("milk","🥛"), W("juice","🧃"), W("smoothie","🥤"), W("chocolate milk","🍫"), W("cup","☕"), W("bottle","🍼"), W("straw","🥤"), W("drink","🥛","g"), W("want","🤲","g"), W("more","➕","b"), W("thirsty","😛","b"), W("hot","🔥","b"), W("cold","❄️","b"), W("empty","🫗","b") ]),
+      s_people: sp("People",[ W("mom","👩"), W("dad","👨"), W("me","👈","y"), W("you","👉","y"), W("grandma","👵"), W("grandpa","👴"), W("sister","👧"), W("brother","👦"), W("baby","👶"), W("friend","🧑‍🤝‍🧑"), W("teacher","🧑‍🏫"), W("doctor","🧑‍⚕️"), W("nurse","👩‍⚕️"), W("family","👪"), W("love","❤️","g"), W("help","🛟","g"), W("where","📍","pu"), W("mine","🙋","y") ]),
+      s_feel: sp("Feelings",[ W("happy","😊"), W("sad","😢"), W("mad","😠"), W("scared","😱"), W("tired","🥱"), W("excited","🤩"), W("silly","🤪"), W("calm","😌"), W("love","❤️"), W("surprised","😮"), W("frustrated","😤"), W("bored","😑"), W("proud","🥲"), W("shy","🙈"), W("okay","👌"), W("feel","💗","g"), W("I","🙋","y"), W("very","⬆️","b"), W("a little","🤏","b") ]),
+      s_body: sp("Body",[ W("head","🧠"), W("hair","💇"), W("eyes","👀"), W("ears","👂"), W("nose","👃"), W("mouth","👄"), W("teeth","🦷"), W("hand","✋"), W("arm","💪"), W("leg","🦵"), W("foot","🦶"), W("tummy","🫃"), W("back","🔙"), W("throat","🗣️"), W("hurt","🤕","g"), W("itchy","😖","b"), W("sick","🤢","b"), W("better","😊","b"), W("where","📍","pu") ]),
+      s_clothes: sp("Clothes",[ W("shirt","👕"), W("pants","👖"), W("shoes","👟"), W("socks","🧦"), W("coat","🧥"), W("hat","🧢"), W("underwear","🩲"), W("pajamas","🩳"), W("dress","👗"), W("boots","🥾"), W("gloves","🧤"), W("diaper","🧷"), W("put on","👕","g"), W("take off","🙅","g"), W("wet","💧","b"), W("dry","☀️","b"), W("dirty","🟤","b"), W("warm","🌡️","b") ]),
+      s_places: sp("Places",[ W("home","🏠"), W("school","🏫"), W("store","🏪"), W("park","🌳"), W("bathroom","🚽"), W("kitchen","🍳"), W("bedroom","🛏️"), W("outside","🌳"), W("inside","🏠"), W("car","🚗"), W("doctor","🏥"), W("restaurant","🍴"), W("playground","🛝"), W("grandma's","👵"), W("go","🚦","g"), W("want","🤲","g"), W("here","📍","w"), W("where","📍","pu") ]),
+      s_play: sp("Play",[ W("ball","⚽"), W("blocks","🧱"), W("book","📖"), W("cars","🚗"), W("doll","🪆"), W("puzzle","🧩"), W("bubbles","🫧"), W("crayons","🖍️"), W("game","🎮"), W("music","🎵"), W("tablet","📱"), W("TV","📺"), W("swing","🛝"), W("slide","🛝"), W("bike","🚲"), W("play","🎲","g"), W("want","🤲","g"), W("my turn","🙋","y"), W("again","🔁","b"), W("fun","😄","b") ]),
+      s_animals: sp("Animals",[ W("dog","🐶"), W("cat","🐱"), W("fish","🐠"), W("bird","🐦"), W("cow","🐮"), W("horse","🐴"), W("pig","🐷"), W("duck","🦆"), W("bunny","🐰"), W("bear","🐻"), W("lion","🦁"), W("elephant","🐘"), W("monkey","🐵"), W("snake","🐍"), W("frog","🐸"), W("big","🔵","b"), W("little","🔹","b"), W("like","👍","g"), W("scared","😱","b") ]),
+      s_school: sp("School",[ W("teacher","🧑‍🏫"), W("friend","🧑‍🤝‍🧑"), W("book","📖"), W("pencil","✏️"), W("paper","📄"), W("table","🪑"), W("chair","🪑"), W("backpack","🎒"), W("crayon","🖍️"), W("glue","🧴"), W("scissors","✂️"), W("bus","🚌"), W("recess","🤸"), W("lunch","🍱"), W("help","🛟","g"), W("work","✍️","g"), W("play","🎲","g"), W("all done","🏁","b"), W("quiet","🤫","b"), W("line up","🚶","g") ]),
+      s_desc: sp("Describing",[ W("big","🔵","b"), W("little","🔹","b"), W("hot","🔥","b"), W("cold","❄️","b"), W("fast","💨","b"), W("slow","🐢","b"), W("loud","📢","b"), W("quiet","🤫","b"), W("clean","✨","b"), W("dirty","🟤","b"), W("wet","💧","b"), W("dry","☀️","b"), W("hard","🧱","b"), W("soft","🧸","b"), W("new","🆕","b"), W("old","📦","b"), W("funny","😂","b"), W("scary","😱","b"), W("yummy","😋","b"), W("yucky","🤢","b"), W("more","➕","b"), W("again","🔁","b") ]),
+      s_more: sp("More",[ F("Colors","🎨","s_colors","o"), F("Numbers","🔢","s_num","o"), F("Time","📅","s_time","o"), F("Weather","☀️","s_weather","o"), F("Go","🚗","s_go","o"), F("Actions","🏃","s_act","o"), F("Chat","💬","s_chat","o"), F("Events","🎉","s_events","o") ]),
+      s_colors: sp("Colors",[ W("red","🔴"), W("orange","🟠"), W("yellow","🟡"), W("green","🟢"), W("blue","🔵"), W("purple","🟣"), W("pink","🩷"), W("black","⚫"), W("white","⚪"), W("brown","🟤"), W("gray","🩶"), W("rainbow","🌈") ]),
+      s_num: sp("Numbers",[ W("one","1️⃣"), W("two","2️⃣"), W("three","3️⃣"), W("four","4️⃣"), W("five","5️⃣"), W("six","6️⃣"), W("seven","7️⃣"), W("eight","8️⃣"), W("nine","9️⃣"), W("ten","🔟"), W("zero","0️⃣"), W("none","🚫","b"), W("all","💯","b"), W("lots","📚","b"), W("more","➕","b"), W("count","🔢","g") ]),
+      s_time: sp("Time",[ W("today","📅"), W("tomorrow","➡️"), W("yesterday","⬅️"), W("morning","🌅"), W("day","☀️"), W("night","🌙"), W("now","⏰","b"), W("later","⏳","b"), W("soon","🔜","b"), W("wait","✋","g"), W("before","◀️","w"), W("after","▶️","w"), W("done","🏁","b") ]),
+      s_weather: sp("Weather",[ W("sunny","☀️"), W("rainy","🌧️"), W("cloudy","☁️"), W("snowy","❄️"), W("windy","💨"), W("hot","🔥","b"), W("cold","❄️","b"), W("storm","⛈️"), W("wet","💧","b"), W("rainbow","🌈") ]),
+      s_go: sp("Go",[ W("car","🚗"), W("bus","🚌"), W("train","🚂"), W("plane","✈️"), W("bike","🚲"), W("truck","🚚"), W("boat","⛵"), W("go","🚦","g"), W("ride","🛞","g"), W("fast","💨","b"), W("stop","🛑","r") ]),
+      s_act: sp("Actions",[ W("run","🏃","g"), W("jump","🤸","g"), W("walk","🚶","g"), W("sit","🪑","g"), W("stand","🧍","g"), W("sleep","😴","g"), W("wash","🧼","g"), W("brush","🪥","g"), W("throw","🤾","g"), W("catch","🧤","g"), W("push","👐","g"), W("pull","🫳","g"), W("dance","💃","g"), W("sing","🎤","g"), W("draw","✏️","g"), W("build","🧱","g"), W("clean up","🧹","g"), W("wait","✋","g"), W("hug","🤗","g"), W("kiss","😘","g") ]),
+      s_chat: sp("Chat",[ W("hi","👋","p"), W("bye","👋","p"), W("my name is","🏷️","p"), W("how are you","❓","p"), W("good","😊","b"), W("fine","👌","b"), W("guess what","💭","p"), W("I don't know","🤷","p"), W("thank you","🤗","p"), W("you're welcome","😊","p"), W("that's funny","😂","p"), W("cool","😎","b"), W("gross","🤢","b"), W("excuse me","🙋","p"), W("high five","🖐️","p") ]),
+      s_events: sp("Events",[ W("birthday","🎂"), W("party","🎉"), W("present","🎁"), W("cake","🍰"), W("vacation","🏖️"), W("trip","🧳"), W("holiday","🎊") ])
     }
   };
 }
@@ -530,13 +423,13 @@ function load(){
     var raw = localStorage.getItem(LS_KEY);
     if (raw){ board = JSON.parse(raw); if (board && board.pages && board.pages.home) return; }
   } catch(e){}
-  board = hisBoard(); save();
+  board = starterBoard(); save();
 }
 function ensureShape(){
   if (!board.targets) board.targets = [];
   if (!board.settings) board.settings = { voice:"", rate:1, pitch:1, instant:true };
   if (!board.settings.size) board.settings.size = "fit";
-  if (!board.settings.hold) board.settings.hold = 0;
+  if (board.settings.hold === undefined) board.settings.hold = 0;
   if (!board.stories) board.stories = [];
   if (board.settings.storyPrompts === undefined) board.settings.storyPrompts = true;
   if (board.settings.vol === undefined) board.settings.vol = 1;
@@ -623,7 +516,8 @@ var IRR = {
   ed: { run:"ran", go:"went", eat:"ate", come:"came", get:"got", make:"made", take:"took", see:"saw", say:"said", sit:"sat", drink:"drank", ride:"rode", sleep:"slept", hear:"heard", think:"thought", find:"found", feel:"felt", have:"had", do:"did", is:"was", are:"were", give:"gave", know:"knew", sing:"sang", swim:"swam", fall:"fell", tell:"told", buy:"bought", catch:"caught", hold:"held", wear:"wore", write:"wrote", draw:"drew", break:"broke", speak:"spoke", stand:"stood", win:"won", fly:"flew", put:"put", read:"read", swing:"swung" },
   en: { eat:"eaten", take:"taken", give:"given", see:"seen", break:"broken", speak:"spoken", write:"written", go:"gone", do:"done", know:"known", fall:"fallen", draw:"drawn", ride:"ridden", wear:"worn", get:"gotten", come:"come", run:"run" },
   er: { good:"better", bad:"worse", far:"farther", many:"more", little:"less" },
-  est:{ good:"best", bad:"worst", far:"farthest", many:"most", little:"least" }
+  est:{ good:"best", bad:"worst", far:"farthest", many:"most", little:"least" },
+  ing:{ be:"being", see:"seeing", open:"opening", listen:"listening", happen:"happening", visit:"visiting", travel:"traveling", run:"running", swim:"swimming", sit:"sitting", get:"getting", put:"putting", cut:"cutting", stop:"stopping" }
 };
 function applySuffix(word, sfx){
   var w = word;
@@ -633,6 +527,7 @@ function applySuffix(word, sfx){
   if (sfx === "s"){ if (/(s|x|z|ch|sh)$/.test(w)) return w+"es"; if (cy()) return w.slice(0,-1)+"ies"; return w+"s"; }
   if (sfx === "ed"){ if (/e$/.test(w)) return w+"d"; if (cy()) return w.slice(0,-1)+"ied"; return w+"ed"; }
   if (sfx === "en"){ if (/e$/.test(w)) return w+"n"; return w+"en"; }
+  if (sfx === "ing"){ if (/[^aeiou]e$/.test(w)) return w.slice(0,-1)+"ing"; if (/[^aeiouwxy][aeiou][^aeiouwxy]$/.test(w)) return w+w.slice(-1)+"ing"; return w+"ing"; }
   if (sfx === "er"){ if (/e$/.test(w)) return w+"r"; if (cy()) return w.slice(0,-1)+"ier"; return w+"er"; }
   if (sfx === "est"){ if (/e$/.test(w)) return w+"st"; if (cy()) return w.slice(0,-1)+"iest"; return w+"est"; }
   if (sfx === "ly"){ if (cy()) return w.slice(0,-1)+"ily"; return w+"ly"; }
@@ -835,7 +730,7 @@ function toast(msg){
 
 /* ---------- spelling keyboard ---------- */
 var spellMode = "abc";
-var PHON = { a:"ah", b:"buh", c:"kuh", d:"duh", e:"eh", f:"fuh", g:"guh", h:"huh", i:"ih", j:"juh", k:"kuh", l:"luh", m:"muh", n:"nuh", o:"aw", p:"puh", q:"kwuh", r:"ruh", s:"suh", t:"tuh", u:"uh", v:"vuh", w:"wuh", x:"kuhs", y:"yuh", z:"zuh" };
+var PHON = { a:"ah", b:"buh", c:"kuh", d:"duh", e:"eh", f:"fuh", g:"gah", h:"huh", i:"ih", j:"juh", k:"kuh", l:"luh", m:"muh", n:"nuh", o:"aw", p:"puh", q:"kwuh", r:"ruh", s:"suh", t:"tuh", u:"uh", v:"vuh", w:"wuh", x:"kuhs", y:"yuh", z:"zuh" };
 var LONGV = [["ā","ay"],["ē","ee"],["ī","eye"],["ō","oh"],["ū","you"]];
 var PUNCT = [[".","period"],["?","question mark"],["!","exclamation mark"],[",","comma"],["'","apostrophe"],[":","colon"],[";","semicolon"]];
 function openSpell(){
@@ -1357,6 +1252,7 @@ function saveDev(){
 }
 function applyTheme(){
   document.body.classList.toggle("dark", dev.theme === "dark");
+  document.body.classList.toggle("hc", !!dev.contrast);
   var tb = document.getElementById("themeBtn");
   if (tb) tb.textContent = dev.theme === "dark" ? "☀️" : "🌙";
 }
@@ -1814,6 +1710,7 @@ function wordIndex(){
 }
 function tokenKey(t){ return t.toLowerCase().replace(/[^a-z0-9''-]/g,""); }
 document.getElementById("storiesBtn").addEventListener("click", openStories);
+document.getElementById("routBtn").addEventListener("click", openCoach);
 function openStories(){
   var canEdit = editing || dev.role === "parent";
   var list = (board.stories || []).map(function(s, i){
@@ -1821,9 +1718,9 @@ function openStories(){
       '<button class="btn ghost sopen" data-i="'+i+'" style="flex:1;text-align:left">📖 '+esc(s.title)+'</button>' +
       (canEdit ? '<button class="btn ghost sedit" data-i="'+i+'" style="flex:0 0 auto;padding:8px 12px">✎</button><button class="btn ghost sdel" data-i="'+i+'" style="flex:0 0 auto;padding:8px 12px">✕</button>' : '') +
       '</div>';
-  }).join("") || '<div class="note">No stories yet.'+(canEdit ? '' : ' Ask a grown-up to add one!')+'</div>';
-  openOv('<h3>📖 Stories</h3><p class="sub">Read along — tap the glowing word!</p>' + list +
-    (canEdit ? '<div class="btnrow"><button class="btn primary" id="snew">＋ New story</button></div>' : '') +
+  }).join("") || '<div class="note">No stories or songs yet.'+(canEdit ? '' : ' Ask a grown-up to add one!')+'</div>';
+  openOv('<h3>📖 Stories &amp; Songs</h3><p class="sub">Read along or sing along — tap the glowing word! Great for favorite books, songs, and nursery rhymes.</p>' + list +
+    (canEdit ? '<div class="btnrow"><button class="btn primary" id="snew">＋ New story or song</button></div>' : '') +
     '<div class="btnrow"><button class="btn" id="sc">Close</button></div>');
   Array.prototype.forEach.call(ovbox.querySelectorAll(".sopen"), function(bt){
     bt.addEventListener("click", function(){ playStory(board.stories[parseInt(bt.getAttribute("data-i"),10)]); });
@@ -2270,6 +2167,7 @@ function openSettings(){
       '<option value="300"'+(board.settings.hold===300?" selected":"")+'>Short hold (0.3s)</option>' +
       '<option value="600"'+(board.settings.hold===600?" selected":"")+'>Long hold (0.6s)</option></select>' +
     '<div class="note">Hold-to-select ignores quick accidental brushes — a button only speaks when pressed deliberately. Both settings are per-device, so they won’t change other devices.</div>' +
+    '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="shc"'+(dev.contrast?" checked":"")+' style="width:auto"> High-contrast mode (bold outlines, black text — easier to see)</label>' +
     '<button class="btn ghost" id="tv" style="width:100%;margin-top:10px">▶ Test voice</button>' +
     '<hr style="border:none;border-top:1px solid var(--soft);margin:16px 0">' +
     '<label>Loudest allowed: <span id="vxv">'+Math.round(board.settings.volMax*100)+'%</span></label>' +
@@ -2292,6 +2190,7 @@ function openSettings(){
   ovbox.querySelector("#sgp").addEventListener("change", function(){ board.settings.storyPrompts = this.checked; save(); });
   ovbox.querySelector("#bsz").addEventListener("change", function(){ board.settings.size = this.value; save(); render(); });
   ovbox.querySelector("#bhold").addEventListener("change", function(){ board.settings.hold = parseInt(this.value,10); save(); });
+  ovbox.querySelector("#shc").addEventListener("change", function(){ dev.contrast = this.checked; saveDev(); applyTheme(); render(); });
   ovbox.querySelector("#tv").addEventListener("click", function(){ speak("Hi! I want to play outside."); });
   ovbox.querySelector("#svx").addEventListener("input", function(){ board.settings.volMax = parseFloat(this.value); clampVol(); ovbox.querySelector("#vxv").textContent = Math.round(board.settings.volMax*100)+"%"; save(); });
   ovbox.querySelector("#svn").addEventListener("input", function(){ board.settings.volMin = parseFloat(this.value); clampVol(); ovbox.querySelector("#vnv").textContent = Math.round(board.settings.volMin*100)+"%"; save(); });
@@ -2314,11 +2213,9 @@ function changePin(){
   });
 }
 function resetMenu(){
-  openOv('<h3>Reset board</h3><p class="sub">This replaces everything on this device. Export a backup first if unsure.</p>' +
-    '<button class="btn ghost" id="r1" style="width:100%;margin-bottom:8px">His board (LAMP layout from photos)</button>' +
-    '<button class="btn ghost" id="r2" style="width:100%">Clean starter board (for a new family)</button>' +
+  openOv('<h3>Reset board</h3><p class="sub">This replaces everything on this device with a fresh starter board. Export a backup first if unsure.</p>' +
+    '<button class="btn ghost" id="r2" style="width:100%">Load clean starter board</button>' +
     '<div class="btnrow"><button class="btn" id="rc">Cancel</button></div>');
-  ovbox.querySelector("#r1").addEventListener("click", function(){ board = hisBoard(); ensureShape(); save(); cur="home"; stack=[]; sent=[]; renderSent(); render(); closeOv(); toast("Loaded his board."); });
   ovbox.querySelector("#r2").addEventListener("click", function(){ board = starterBoard(); ensureShape(); save(); cur="home"; stack=[]; sent=[]; renderSent(); render(); closeOv(); toast("Loaded starter board."); });
   ovbox.querySelector("#rc").addEventListener("click", openSettings);
 }
