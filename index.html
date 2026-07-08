@@ -46,8 +46,9 @@
     --ambient:none; --kitetail:#000000;
   }
   body.hc #gridwrap { background:#ffffff; }
-  body.hc .cell { outline:3px solid #000; outline-offset:-3px; border-radius:14px; }
-  body.hc .cell .lab { color:#000; font-weight:800; }
+  body.hc #grid { gap:9px; }
+  body.hc .cell .pic { border:3px solid #000; box-shadow:0 3px 0 #000; }
+  body.hc .cell .lab { color:#000; font-weight:700; }
   body.hc .cell .foldmark, body.hc .cell .editmark { color:#000; }
   body.hc #sent .chip { border:2px solid #000; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -97,7 +98,7 @@
   .cell:active .pic { transform:translateY(3px); box-shadow:0 0 0 var(--edge, transparent), 0 1px 3px rgba(0,0,0,.12); }
   .cell .pic img { max-width:84%; max-height:88%; object-fit:contain; border-radius:12px; }
   .cell .pic .em { font-size:clamp(16px,4.4vmin,36px); line-height:1; }
-  .cell .lab { font-size:clamp(9px,1.6vmin,13px); font-weight:600; line-height:1.1; width:100%; color:var(--text);
+  .cell .lab { font-size:clamp(9px,1.6vmin,13px); font-weight:600; line-height:1.32; width:100%; color:var(--text);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .cell.empty { cursor:default; }
   .cell.empty:active { transform:none; }
@@ -107,6 +108,7 @@
   .cell .editmark { position:absolute; top:4px; left:8px; font-size:11px; color:var(--muted); display:none; }
   body.editing .cell .editmark { display:block; }
   body.editing .cell { touch-action:none; }
+  body.editing #gridwrap { touch-action:none; overscroll-behavior:contain; }
 
   /* Bottom bar */
   #botbar { display:flex; align-items:center; gap:8px; padding:4px 14px 8px; background:transparent; }
@@ -370,6 +372,23 @@ var LOG_KEY = "talkboard_v3_log";
 function getLog(){
   try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch(e){ return []; }
 }
+function markMilestone(key, msg, say){
+  if (!board.milestones) board.milestones = {};
+  if (board.milestones[key]) return false;
+  board.milestones[key] = Date.now(); save();
+  toast("🎉 " + msg);
+  if (say) setTimeout(function(){ speak(say); }, 450);
+  return true;
+}
+function checkWordMilestones(){
+  var d = {}; getLog().forEach(function(e){ d[e.w.toLowerCase()] = 1; });
+  var n = Object.keys(d).length, tiers = [10,25,50,100,200,300];
+  for (var i=0;i<tiers.length;i++){
+    if (n >= tiers[i] && !(board.milestones && board.milestones["words"+tiers[i]])){
+      markMilestone("words"+tiers[i], tiers[i]+" different words used! 🌟", "Wow! "+tiers[i]+" words!"); break;
+    }
+  }
+}
 function logWord(w){
   try {
     var lg = getLog();
@@ -383,6 +402,7 @@ function logWord(w){
     idbSet(LOG_KEY, lj);
   } catch(e){}
   queueUsage(w);
+  try { checkWordMilestones(); } catch(e){}
 }
 
 /* ---------- durable storage mirror (IndexedDB survives iOS cache cleanups) ---------- */
@@ -427,6 +447,7 @@ function load(){
 }
 function ensureShape(){
   if (!board.targets) board.targets = [];
+  if (!board.milestones) board.milestones = {};
   if (!board.settings) board.settings = { voice:"", rate:1, pitch:1, instant:true };
   if (!board.settings.size) board.settings.size = "fit";
   if (board.settings.hold === undefined) board.settings.hold = 0;
@@ -436,6 +457,7 @@ function ensureShape(){
   if (board.settings.volMax === undefined) board.settings.volMax = 1;
   if (board.settings.volMin === undefined) board.settings.volMin = 0.15;
   if (!board.settings.kbLayout) board.settings.kbLayout = "qwerty";
+  if (!board.settings.routineLevel) board.settings.routineLevel = 1;
   if (!board.fspFix){
     Object.keys(board.pages).forEach(function(pk){
       var cs = board.pages[pk].cells;
@@ -710,7 +732,7 @@ function renderSent(){
 }
 
 document.getElementById("spk").addEventListener("click", function(){
-  if (sent.length) playItems(sent);
+  if (sent.length){ playItems(sent); if (sent.length >= 2) markMilestone("firstCombo", "First time combining words! 🌟", "You put words together!"); }
 });
 document.getElementById("clr").addEventListener("click", function(){ sent=[]; renderSent(); });
 document.getElementById("bsp").addEventListener("click", function(){ sent.pop(); renderSent(); });
@@ -1151,6 +1173,13 @@ function firstEmpty(pageKey, fromIdx){
   for (var i = (fromIdx || 0); i < ROWS*COLS; i++){ if (!cells[i]) return i; }
   return -1;
 }
+function emptyCount(pk){ var c = board.pages[pk].cells, n = 0; for (var i = 0; i < ROWS*COLS; i++){ if (!c[i]) n++; } return n; }
+function makeSpillPage(fromKey){
+  var base = board.pages[fromKey].name.replace(/ \d+$/,"");
+  var pid = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+  board.pages[pid] = stubPage(base + " 2");
+  return pid;
+}
 function openBuilder(){
   var chips = Object.keys(TOPICS).map(function(k){
     return '<button class="btn ghost tchip" data-t="'+esc(k)+'" style="flex:0 0 auto;padding:8px 12px;font-size:13px">'+esc(k)+'</button>';
@@ -1213,15 +1242,21 @@ function openBuilder(){
       board.pages[parent].cells[slot] = F(name, "🗂️", pid, "o", false);
       dest = pid;
     }
-    var added = 0, at = 0;
-    words.forEach(function(p){
-      var idx = firstEmpty(dest, at);
-      if (idx < 0) return;
-      board.pages[dest].cells[idx] = W(p.w, p.e);
-      at = idx + 1; added++;
-    });
+    var added = 0, curDest = dest, wi = 0, spilled = false;
+    while (wi < words.length){
+      var empties = emptyCount(curDest);
+      if (empties === 0){ curDest = makeSpillPage(curDest); spilled = true; continue; }
+      if (empties === 1 && (words.length - wi) > 1){
+        var li = firstEmpty(curDest, 0), np = makeSpillPage(curDest);
+        board.pages[curDest].cells[li] = F(board.pages[curDest].name + " ▸", "➡️", np, "o", false);
+        curDest = np; spilled = true; continue;
+      }
+      var idx = firstEmpty(curDest, 0);
+      board.pages[curDest].cells[idx] = W(words[wi].w, words[wi].e);
+      added++; wi++;
+    }
     save(); render(); closeOv();
-    toast(added + " words added to “" + board.pages[dest].name + "” — get symbols in Settings.");
+    toast(added + " words added" + (spilled ? " — a new page was created for the overflow" : " to “" + board.pages[dest].name + "”") + ". Get symbols in Settings.");
   });
 }
 
@@ -1277,26 +1312,108 @@ function loadScript(src, cb){
   s.src = src; s.onload = function(){ cb(null); }; s.onerror = function(){ cb("err"); };
   document.head.appendChild(s);
 }
+var fbCbs = null;
 function initFirebase(cb){
   if (db){ cb(null); return; }
   if (!dev.fb){ cb("No Firebase config saved yet."); return; }
+  if (fbCbs){ fbCbs.push(cb); return; }
+  fbCbs = [cb];
+  function done(err){ var q = fbCbs; fbCbs = null; q.forEach(function(f){ f(err); }); }
   var base = "https://www.gstatic.com/firebasejs/10.14.1/";
   loadScript(base+"firebase-app-compat.js", function(e1){
-    if (e1){ cb("Couldn’t load Firebase — check internet."); return; }
+    if (e1){ done("Couldn’t load Firebase — check internet."); return; }
     loadScript(base+"firebase-auth-compat.js", function(e2){
-      if (e2){ cb("Couldn’t load Firebase auth."); return; }
+      if (e2){ done("Couldn’t load Firebase auth."); return; }
       loadScript(base+"firebase-firestore-compat.js", function(e3){
-        if (e3){ cb("Couldn’t load Firestore."); return; }
+        if (e3){ done("Couldn’t load Firestore."); return; }
         try {
-          firebase.initializeApp(dev.fb);
-          firebase.auth().signInAnonymously().then(function(){
-            db = firebase.firestore(); cb(null);
-          }).catch(function(err){ cb("Sign-in failed: "+err.message+" — enable Anonymous sign-in in Firebase Authentication."); });
-        } catch(err){ cb("Config problem: "+err.message); }
+          if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(dev.fb);
+          var au = firebase.auth(), settled = false;
+          au.onAuthStateChanged(function(user){
+            if (settled) return;
+            if (user){ settled = true; db = firebase.firestore(); done(null); }
+            else { au.signInAnonymously().catch(function(err){ if (!settled){ settled = true; done("Sign-in failed: "+err.message+" — enable Anonymous sign-in in Firebase Authentication."); } }); }
+          });
+        } catch(err){ done("Config problem: "+err.message); }
       });
     });
   });
 }
+function friendlyAuth(e){
+  var c = (e && e.code) || "";
+  if (c === "auth/email-already-in-use") return "That email already has an account — use Sign in instead.";
+  if (c === "auth/wrong-password" || c === "auth/invalid-credential") return "Wrong email or password.";
+  if (c === "auth/user-not-found") return "No account with that email yet — create one instead.";
+  if (c === "auth/invalid-email") return "That does not look like a valid email.";
+  if (c === "auth/weak-password") return "Password should be at least 6 characters.";
+  if (c === "auth/popup-blocked" || c === "auth/popup-closed-by-user" || c === "auth/cancelled-popup-request") return "Google sign-in was closed — try again.";
+  if (c === "auth/operation-not-allowed") return "That sign-in method isn’t enabled in Firebase yet.";
+  return (e && e.message) || "Something went wrong.";
+}
+function isEmailUser(){ return !!(window.firebase && firebase.auth && firebase.auth().currentUser && !firebase.auth().currentUser.isAnonymous); }
+function saveUserProfile(){
+  try {
+    var u = firebase.auth().currentUser;
+    if (!db || !u || u.isAnonymous) return;
+    db.collection("users").doc(u.uid).set({ email: u.email || null, role: dev.role || "child", code: dev.code || null, updated: Date.now() }, { merge: true });
+  } catch(e){}
+}
+function recoverProfile(cb){
+  try {
+    var u = firebase.auth().currentUser;
+    if (!db || !u){ cb(null); return; }
+    db.collection("users").doc(u.uid).get().then(function(snap){
+      var d = snap.exists ? snap.data() : null;
+      if (d && d.code && !dev.code){
+        dev.code = d.code; if (d.role) dev.role = d.role; saveDev();
+        syncOn = true; startListen(); setStatus("Restoring your board…");
+      } else { saveUserProfile(); }
+      cb(null);
+    }).catch(function(){ cb(null); });
+  } catch(e){ cb(null); }
+}
+function signUpEmail(email, pass, cb){
+  initFirebase(function(err){
+    if (err){ cb(err); return; }
+    var au = firebase.auth(), u = au.currentUser;
+    function after(){ saveUserProfile(); if (dev.code){ syncOn = true; startListen(); } cb(null); }
+    try {
+      var cred = firebase.auth.EmailAuthProvider.credential(email, pass);
+      if (u && u.isAnonymous){
+        u.linkWithCredential(cred).then(after).catch(function(er){
+          if (er.code === "auth/email-already-in-use" || er.code === "auth/credential-already-in-use"){
+            au.signInWithEmailAndPassword(email, pass).then(function(){ recoverProfile(cb); }).catch(function(x){ cb(friendlyAuth(x)); });
+          } else cb(friendlyAuth(er));
+        });
+      } else {
+        au.createUserWithEmailAndPassword(email, pass).then(after).catch(function(er){ cb(friendlyAuth(er)); });
+      }
+    } catch(er){ cb(friendlyAuth(er)); }
+  });
+}
+function signInEmail(email, pass, cb){
+  initFirebase(function(err){
+    if (err){ cb(err); return; }
+    firebase.auth().signInWithEmailAndPassword(email, pass).then(function(){ recoverProfile(cb); }).catch(function(er){ cb(friendlyAuth(er)); });
+  });
+}
+function signInGoogle(cb){
+  initFirebase(function(err){
+    if (err){ cb(err); return; }
+    var au = firebase.auth(), u = au.currentUser, prov = new firebase.auth.GoogleAuthProvider();
+    var op = (u && u.isAnonymous) ? u.linkWithPopup(prov) : au.signInWithPopup(prov);
+    op.then(function(){ recoverProfile(cb); }).catch(function(er){
+      if (er.code === "auth/credential-already-in-use" || er.code === "auth/email-already-in-use"){
+        au.signInWithPopup(prov).then(function(){ recoverProfile(cb); }).catch(function(x){ cb(friendlyAuth(x)); });
+      } else cb(friendlyAuth(er));
+    });
+  });
+}
+function signOutAcct(cb){
+  try { firebase.auth().signOut().then(function(){ firebase.auth().signInAnonymously().then(function(){ if(cb)cb(); }).catch(function(){ if(cb)cb(); }); }).catch(function(){ if(cb)cb(); }); }
+  catch(e){ if(cb)cb(); }
+}
+
 function parseFbConfig(txt){
   var m = String(txt).match(/\{[\s\S]*\}/);
   if (!m) return null;
@@ -1450,18 +1567,26 @@ function connectFamily(mode, code, cb){
     if (err){ cb(err); return; }
     if (mode === "create"){
       dev.code = code; saveDev();
-      syncOn = true; pushBoard(); startListen(); cb(null);
+      syncOn = true; pushBoard(); startListen(); saveUserProfile(); cb(null);
     } else {
       db.collection("families").doc(code).get().then(function(snap){
         if (!snap.exists){ cb("No family found with that code — check it and try again."); return; }
-        dev.code = code; saveDev(); syncOn = true; startListen(); cb(null);
+        dev.code = code; saveDev(); syncOn = true; startListen(); saveUserProfile(); cb(null);
       }).catch(function(e){ cb("Couldn’t connect: " + e.message); });
     }
   });
 }
 function openSyncDlg(){
+  var cu = (window.firebase && firebase.auth && firebase.auth().currentUser) || null;
+  var emailUser = (cu && !cu.isAnonymous) ? (cu.email || "your account") : null;
+  var acctHtml = emailUser
+    ? '<div style="background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px">✓ Signed in as <b>'+esc(emailUser)+'</b> — your board is backed up to your account and can be restored on any device.</div>' +
+      '<div class="btnrow"><button class="btn ghost" id="acSignOut">Sign out</button></div>'
+    : '<div class="note">💾 Create a free account to back up your board and restore it on any device — even if you lose your family code.</div>' +
+      '<div class="btnrow"><button class="btn primary" id="acCreate">Create free account</button><button class="btn ghost" id="acSignIn">Sign in</button></div>';
   var connected = syncOn && dev.code;
-  openOv('<h3>☁ Phone sync</h3>' +
+  openOv('<h3>☁ Account &amp; sync</h3>' + acctHtml +
+    '<hr style="border:none;border-top:1px solid var(--soft);margin:14px 0">' +
     (connected
       ? '<p class="sub">Connected to family <b style="font-size:17px;letter-spacing:2px">'+esc(dev.code)+'</b> as <b>'+(dev.role==="parent"?"parent phone":"child device")+'</b>. Edits sync automatically. Enter this code on other devices to join.</p>' +
         '<div class="btnrow"><button class="btn danger" id="sydis">Disconnect this device</button></div>' +
@@ -1477,6 +1602,10 @@ function openSyncDlg(){
         '<div class="btnrow"><button class="btn" id="syc">Close</button></div>')
   );
   ovbox.querySelector("#syc").addEventListener("click", openSettings);
+  var el;
+  if ((el = ovbox.querySelector("#acCreate"))) el.addEventListener("click", function(){ openAccountDlg("signup"); });
+  if ((el = ovbox.querySelector("#acSignIn"))) el.addEventListener("click", function(){ openAccountDlg("signin"); });
+  if ((el = ovbox.querySelector("#acSignOut"))) el.addEventListener("click", function(){ signOutAcct(function(){ toast("Signed out."); openSyncDlg(); }); });
   if (connected){
     ovbox.querySelector("#sydis").addEventListener("click", function(){
       if (unsubBoard) unsubBoard();
@@ -1515,6 +1644,34 @@ function openSyncDlg(){
     });
   });
 }
+function openAccountDlg(mode){
+  var isUp = mode !== "signin";
+  openOv('<h3>'+(isUp?"Create a free account":"Sign in")+'</h3>' +
+    '<p class="sub">'+(isUp?"Back up your board and restore it on any device — even if you lose your family code. Free forever.":"Sign in to restore your board on this device.")+'</p>' +
+    '<label>Email</label><input type="email" id="acEmail" autocomplete="email" placeholder="you@example.com">' +
+    '<label>Password</label><input type="password" id="acPass" placeholder="at least 6 characters">' +
+    '<div class="note" id="acMsg"></div>' +
+    '<div class="btnrow"><button class="btn primary" id="acGo">'+(isUp?"Create account":"Sign in")+'</button></div>' +
+    '<div class="btnrow"><button class="btn ghost" id="acGoogle">Continue with Google</button></div>' +
+    '<div class="btnrow"><button class="btn" id="acBack">Back</button><button class="btn ghost" id="acSwitch">'+(isUp?"I already have one":"Create one instead")+'</button></div>');
+  ovbox.querySelector("#acBack").addEventListener("click", openSyncDlg);
+  ovbox.querySelector("#acSwitch").addEventListener("click", function(){ openAccountDlg(isUp?"signin":"signup"); });
+  ovbox.querySelector("#acGo").addEventListener("click", function(){
+    var em = ovbox.querySelector("#acEmail").value.trim(), pw = ovbox.querySelector("#acPass").value, msg = ovbox.querySelector("#acMsg");
+    if (!em || pw.length < 6){ msg.textContent = "Enter an email and a password of at least 6 characters."; return; }
+    msg.textContent = "Working…";
+    (isUp?signUpEmail:signInEmail)(em, pw, function(err){
+      if (err){ msg.textContent = err; return; }
+      toast(isUp ? "Account created ✓ Board backed up." : "Signed in ✓");
+      openSyncDlg();
+    });
+  });
+  ovbox.querySelector("#acGoogle").addEventListener("click", function(){
+    ovbox.querySelector("#acMsg").textContent = "Opening Google…";
+    signInGoogle(function(err){ if (err){ ovbox.querySelector("#acMsg").textContent = err; return; } toast("Signed in with Google ✓"); openSyncDlg(); });
+  });
+}
+
 /* remote report: parent phone reads what the child device uploaded */
 function remoteReport(){
   openOv('<h3>📊 Weekly report</h3><p class="sub">Loading from your family…</p>');
@@ -1644,6 +1801,14 @@ function openReport(){
     return m;
   }
   var cT = countBy(thisW), cL = countBy(lastW);
+  var firstSeenAll = {};
+  log.forEach(function(e){ var k=e.w.toLowerCase(); if(!firstSeenAll[k]||e.t<firstSeenAll[k]) firstSeenAll[k]=e.t; });
+  var distinctW = Object.keys(cT).length;
+  var newWords = Object.keys(cT).filter(function(k){ return firstSeenAll[k] > now-wk; });
+  var adays = {}; thisW.forEach(function(e){ adays[dkey(new Date(e.t))]=1; });
+  var activeDays = Object.keys(adays).length;
+  var growthPct = lastW.length ? Math.round((thisW.length-lastW.length)/lastW.length*100) : null;
+  function gstat(n,l){ return '<div style="flex:1;background:var(--soft);border-radius:12px;padding:8px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--accent)">'+n+'</div><div style="font-size:11px;color:var(--muted)">'+l+'</div></div>'; }
   var top = Object.keys(cT).sort(function(a,b){ return cT[b]-cT[a]; }).slice(0,10);
   var maxN = top.length ? cT[top[0]] : 1;
   var topHtml = top.length ? top.map(function(w){
@@ -1674,6 +1839,10 @@ function openReport(){
   openOv('<h3>📊 Weekly report</h3>' +
     '<div class="btnrow" style="margin-top:0"><button class="btn ghost" id="deepb">🔎 Detailed report &amp; CSV export</button></div>' +
     '<p class="sub">'+thisW.length+' words spoken this week'+(lastW.length?' (' + lastW.length + ' last week)':'')+'</p>' +
+    '<label>Communication growth</label>' +
+    '<div style="display:flex;gap:8px">'+gstat(distinctW,"different words")+gstat(newWords.length,"new this week")+gstat(activeDays,"active days")+'</div>' +
+    (newWords.length?'<div style="font-size:13px;margin-top:6px">🌱 New words this week: <b>'+newWords.slice(0,12).map(esc).join(", ")+'</b></div>':'') +
+    (growthPct!==null?'<div style="font-size:13px;margin-top:4px;color:'+(growthPct>=0?'var(--good)':'var(--muted)')+'">'+(growthPct>=0?'▲ '+growthPct+'% more than last week':'every week looks different — keep modeling')+'</div>':'') +
     '<label>Words per day</label><div style="display:flex;align-items:flex-end;gap:4px;height:74px">'+days+'</div>' +
     '<label>Most used words</label>'+topHtml +
     '<label>Target words</label>'+tHtml +
@@ -1871,8 +2040,10 @@ function advanceGuide(){
 }
 function finishGuide(){
   var wf = guide && guide.wf;
+  var rt = guide && guide.rt;
   guide = null; updateGuideBar(); render();
   if (wf){ toast("🎉 Found it!"); speak("You found it!"); return; }
+  if (rt){ openOv('<h3>🎉 Routine done!</h3><div style="text-align:center;font-size:42px;margin:10px 0">🌟 🎉 🌟</div><p class="sub" style="text-align:center;font-size:15px">You practiced every word — great talking!</p><div class="btnrow"><button class="btn primary" id="stdone">Done</button></div>'); setTimeout(function(){ speak("Great talking!"); }, 1200); ovbox.querySelector("#stdone").addEventListener("click", closeOv); return; }
   openOv('<h3>📖 The end!</h3><div style="text-align:center;font-size:42px;margin:10px 0">🎉 ⭐ 🎉</div><p class="sub" style="text-align:center;font-size:15px">Great reading!</p><div class="btnrow"><button class="btn primary" id="stdone">Done</button></div>');
   setTimeout(function(){ speak("The end! Great reading!"); }, 1200);
   ovbox.querySelector("#stdone").addEventListener("click", closeOv);
@@ -2080,25 +2251,35 @@ function gameRound(){
 /* ---------- Model With Me: routine coach ---------- */
 var ROUTINES = [
   { n:"Bedtime", e:"🌙", w:["tired","read","more","goodnight"], p:"read more",
-    t:"While tucking in, tap read and say it. Read a page, then model \u201cread more?\u201d and wait." },
+    lv:["tired read more goodnight","I tired read more goodnight now","I am tired let's read more time to say goodnight"],
+    t:"While tucking in, tap each word and say it. Read a page, model read more, then wait." },
   { n:"Snack time", e:"🍎", w:["eat","more","want","finished"], p:"want more",
-    t:"Hold the snack, model \u201ceat\u201d. Give a little. Model \u201cmore?\u201d before handing over more. Tap finished at the end." },
+    lv:["eat more want finished","I want eat more all finished","I want to eat I want more I am all finished"],
+    t:"Hold the snack, model eat. Give a little. Model more before handing over more. Tap finished at the end." },
   { n:"Mealtime", e:"🍽️", w:["eat","drink","more","finished"], p:"more drink",
-    t:"Narrate the meal: \u201ceat\u201d, \u201cdrink\u201d. Offer two choices and model both words before he picks." },
+    lv:["eat drink more finished","I eat I drink more please finished","I want to eat I want a drink more please I am finished"],
+    t:"Narrate the meal: eat, drink. Offer two choices and model both words before he picks." },
   { n:"Bath time", e:"🛁", w:["water","in","help","finished"], p:"in water",
-    t:"Model \u201cin\u201d as each toy goes in the tub. Splash and comment \u2014 bath talk is play, not testing." },
+    lv:["water in help finished","in the water help me all finished","I get in the water help me please I am all finished"],
+    t:"Model in as each toy goes in the tub. Splash and comment — bath talk is play, not testing." },
   { n:"Car ride", e:"🚗", w:["go","stop","fast","look"], p:"go fast",
-    t:"Model \u201cgo\u201d when the light changes, \u201cstop\u201d at stop signs. Point out the window and tap look." },
+    lv:["go stop fast look","go fast please stop look there","let's go fast please stop look over there"],
+    t:"Model go when the light changes, stop at stop signs. Point out the window and tap look." },
   { n:"Playground", e:"🌳", w:["play","up","down","more"], p:"up more",
-    t:"Model \u201cup\u201d as the swing rises, \u201cdown\u201d on the slide. One word per push \u2014 rhythm builds words." },
+    lv:["play up down more","I play go up go down more please","I want to play go up high go down more turn please"],
+    t:"Model up as the swing rises, down on the slide. One word per push — rhythm builds words." },
   { n:"School pickup", e:"🎒", w:["happy","school","what","do"], p:"what do",
-    t:"Instead of quizzing \u201cwhat did you do?\u201d, model your own day: \u201cI do work. I happy.\u201d Then wait." },
+    lv:["happy school what do","I happy at school what you do","I am happy at school what did you do today"],
+    t:"Instead of quizzing, model your own day: I do work. I happy. Then wait." },
   { n:"Morning", e:"🌞", w:["up","wear","eat","go"], p:"wear this",
-    t:"Model \u201cup\u201d at wake-up, \u201cwear\u201d while offering two shirts, \u201cgo\u201d heading out the door." },
+    lv:["up wear eat go","get up wear this eat now go outside","time to get up I wear this I eat breakfast let's go"],
+    t:"Model up at wake-up, wear while offering two shirts, go heading out the door." },
   { n:"Feelings check", e:"🎭", w:["feel","happy","sad","mad"], p:"I feel happy",
-    t:"Model YOUR feelings first: \u201cI feel tired.\u201d Kids learn feeling words by hearing them used honestly." },
+    lv:["feel happy sad mad","I feel happy I feel sad I feel mad","I feel happy today are you sad why are you mad"],
+    t:"Model YOUR feelings first: I feel tired. Kids learn feeling words by hearing them used honestly." },
   { n:"Play time", e:"🎲", w:["play","want","more","stop"], p:"play more",
-    t:"Follow his lead. Model \u201cmore\u201d before restarting a game he loves. Model \u201cstop\u201d and actually stop \u2014 words must have power." }
+    lv:["play want more stop","I want play more please stop now","I want to play more turn please stop now"],
+    t:"Follow his lead. Model more before restarting a game he loves. Model stop and actually stop." }
 ];
 function openCoach(){
   var chips = ROUTINES.map(function(r, i){
@@ -2113,26 +2294,34 @@ function openCoach(){
   ovbox.querySelector("#cc").addEventListener("click", openSettings);
 }
 function coachDetail(r){
+  var lvl = board.settings.routineLevel || 1;
+  var lvlName = ["Single words","Short phrases","Sentences"][lvl-1];
+  var toks = routineToks(r);
   var ix = wordIndex();
-  var chips = r.w.map(function(w){
+  var chips = toks.map(function(w){
     var b = ix[w.toLowerCase()];
-    if (b){
-      var pc = palColors(b.c);
-      return '<button class="cw" data-w="'+esc(b.l)+'" style="border:none;border-radius:12px;padding:10px 14px;font-size:16px;font-weight:700;cursor:pointer;color:var(--text);background:'+pc[0]+';box-shadow:0 2px 0 '+pc[1]+'">'+(b.e && b.e !== "⬜" ? b.e+" " : "")+esc(w)+'</button>';
-    }
-    return '<span style="padding:10px 14px;font-size:15px;color:var(--muted);border:1.5px dashed var(--border);border-radius:12px">'+esc(w)+' <span style="font-size:10px">(not on the board yet)</span></span>';
-  }).join("");
-  openOv('<h3>'+r.e+' '+esc(r.n)+'</h3>' +
-    '<label>Model these words — tap one to see its path on the board</label>' +
-    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0">'+chips+'</div>' +
+    if (b){ var pc = palColors(b.c); return '<span style="border-radius:10px;padding:6px 10px;font-size:15px;font-weight:700;color:var(--text);background:'+pc[0]+';box-shadow:0 2px 0 '+pc[1]+'">'+(b.e && b.e!=="⬜" ? b.e+" " : "")+esc(w)+'</span>'; }
+    return '<span style="padding:6px 10px;font-size:15px;color:var(--muted)">'+esc(w)+'</span>';
+  }).join(" ");
+  openOv('<h3>'+r.e+' '+esc(r.n)+' <span style="font-size:12px;color:var(--muted);font-weight:600">· '+lvlName+'</span></h3>' +
+    '<label>Tap Start, then follow the glow through every word — do the whole routine</label>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;align-items:center">'+chips+'</div>' +
     '<label>Try this</label><div style="font-size:15px;background:var(--tipbg);border:1px solid var(--tipborder);border-radius:12px;padding:10px 12px">'+esc(r.t)+'</div>' +
-    '<label>Say together</label><div style="font-size:20px;font-weight:800;color:var(--accent);text-align:center;padding:6px">\u201c'+esc(r.p)+'\u201d</div>' +
-    '<div class="note">Golden rules: model without expecting anything back \u00b7 wait 10 seconds \u00b7 respond to every tap like it\u2019s talking \u2014 because it is.</div>' +
-    '<div class="btnrow"><button class="btn" id="cb">\u2190 Routines</button></div>');
-  Array.prototype.forEach.call(ovbox.querySelectorAll(".cw"), function(bt){
-    bt.addEventListener("click", function(){ closeOv(); startWordGuide(bt.getAttribute("data-w")); });
-  });
+    '<div class="note">Set the level (single words → phrases → sentences) in Settings. Golden rules: model without expecting anything back · wait 10 seconds · respond to every tap like it is talking.</div>' +
+    '<div class="btnrow"><button class="btn" id="cb">← Routines</button><button class="btn primary" id="cstart">▶ Start</button></div>');
   ovbox.querySelector("#cb").addEventListener("click", openCoach);
+  ovbox.querySelector("#cstart").addEventListener("click", function(){ startRoutine(r); });
+}
+function routineToks(r){
+  var lvl = board.settings.routineLevel || 1;
+  var txt = (r.lv && r.lv[lvl-1]) || r.w.join(" ");
+  return txt.split(/\s+/).filter(Boolean);
+}
+function startRoutine(r){
+  closeOv();
+  cur = "home"; stack = [];
+  guide = { title: r.n, toks: routineToks(r), pos: -1, path: null, rt: true };
+  advanceGuide();
 }
 
 /* ---------- settings ---------- */
@@ -2150,6 +2339,10 @@ function openSettings(){
     '<button class="btn ghost" id="rep" style="width:100%;margin-top:6px">📊 Weekly report &amp; target words</button>' +
     '<button class="btn ghost" id="syncb" style="width:100%;margin-top:6px">☁ Phone sync '+(syncOn ? "· connected ✓" : "· set up")+'</button>' +
     '<button class="btn ghost" id="coachb" style="width:100%;margin-top:6px">🧭 Model With Me — routine coach</button>' +
+    '<label>Routine level — how routines build up</label><select id="rlv">' +
+      '<option value="1"'+((board.settings.routineLevel||1)===1?" selected":"")+'>Single words</option>' +
+      '<option value="2"'+(board.settings.routineLevel===2?" selected":"")+'>Short phrases</option>' +
+      '<option value="3"'+(board.settings.routineLevel===3?" selected":"")+'>Sentences</option></select>' +
     '<label>Voice</label><select id="vv">'+vopts+'</select>' +
     '<div class="note">Tip: on iPad, download a free “Enhanced” voice in Settings → Accessibility → Spoken Content → Voices for a much more natural child voice — it will appear in this list.</div>' +
     '<label>Voice pitch: <span id="pvv">'+board.settings.pitch.toFixed(1)+'</span> (higher = younger)</label>' +
@@ -2183,6 +2376,7 @@ function openSettings(){
   ovbox.querySelector("#rep").addEventListener("click", openReport);
   ovbox.querySelector("#syncb").addEventListener("click", openSyncDlg);
   ovbox.querySelector("#coachb").addEventListener("click", openCoach);
+  ovbox.querySelector("#rlv").addEventListener("change", function(){ board.settings.routineLevel = parseInt(this.value,10); save(); });
   ovbox.querySelector("#vv").addEventListener("change", function(){ board.settings.voice = this.value; save(); });
   ovbox.querySelector("#sp").addEventListener("input", function(){ board.settings.pitch = parseFloat(this.value); ovbox.querySelector("#pvv").textContent = board.settings.pitch.toFixed(1); save(); });
   ovbox.querySelector("#sr").addEventListener("input", function(){ board.settings.rate = parseFloat(this.value); ovbox.querySelector("#rvv").textContent = board.settings.rate.toFixed(1); save(); });
