@@ -145,6 +145,12 @@
   #guidebar button { margin-left:auto; border:none; background:var(--glass); border-radius:999px; padding:6px 12px; font-weight:700; cursor:pointer; color:var(--text); }
   .cell.guide-glow .pic { outline:3px solid var(--accent); animation:tbglow 1.1s ease-in-out infinite; }
   #homeBtn.guide-glow { outline:3px solid var(--accent); animation:tbglow 1.1s ease-in-out infinite; }
+  @keyframes tbflash {
+    0%, 100% { outline: 0px solid transparent; filter: none; }
+    50%      { outline: 4px solid var(--bad); filter: brightness(1.3); }
+  }
+  .flash-clear .pic { animation: tbflash 0.45s 5; }
+  #clr.flash-clear { animation: tbflash 0.45s 5; border-radius: 16px; }
   /* stories + game */
   .sttile { display:flex; align-items:center; gap:6px; border:none; border-radius:14px; padding:8px 12px; font-size:16px; font-weight:600; cursor:pointer; color:var(--text); box-shadow:0 2px 0 var(--edge,transparent); }
   .sttile.st-done { opacity:.4; }
@@ -162,6 +168,23 @@
   .pinpad { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
   .pinpad button { padding:14px; font-size:20px; font-weight:600; border:1px solid var(--border); border-radius:14px; background:var(--panel); color:var(--text); cursor:pointer; }
   .note { font-size:12px; color:var(--muted); margin-top:8px; }
+  /* phones: preserve the exact 12x7 motor plan, pan to reach it; slim the bars */
+  @media (max-width: 560px){
+    #grid { grid-template-columns: repeat(12, minmax(54px, 1fr)) !important;
+            grid-template-rows: repeat(7, minmax(62px, auto)) !important;
+            height: auto !important; width: max-content; min-width: 100%; }
+    #gridwrap { overflow: auto !important; -webkit-overflow-scrolling: touch; }
+    #brand span { display: none; }
+    #navbar { flex-wrap: wrap; gap: 5px; padding: 5px 8px; }
+    #navbar button { padding: 6px 10px; font-size: 13px; }
+    #enote { display: none !important; }
+    #botbar { flex-wrap: wrap; gap: 5px; padding: 4px 8px 8px; }
+    #botbar button { padding: 7px 12px; font-size: 13px; }
+    .tbtn { min-width: 46px; padding: 0 10px; }
+    #sent { min-height: 54px; }
+    .cell .pic .em { font-size: 24px; }
+    .cell .lab { font-size: 10px; }
+  }
   #toast { position:fixed; left:50%; bottom:70px; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:10px 18px; border-radius:999px; font-size:14px; display:none; z-index:60; max-width:90vw; text-align:center; box-shadow:var(--shadow); }
 </style>
 </head>
@@ -300,7 +323,7 @@ function starterBoard(){
       s_drinks: sp("Drinks",[ W("water","💧"), W("milk","🥛"), W("juice","🧃"), W("smoothie","🥤"), W("chocolate milk","🍫"), W("cup","☕"), W("bottle","🍼"), W("straw","🥤"), W("drink","🥛","g"), W("want","🤲","g"), W("more","➕","b"), W("thirsty","😛","b"), W("hot","🔥","b"), W("cold","❄️","b"), W("empty","🫗","b") ]),
       s_people: sp("People",[ W("mom","👩"), W("dad","👨"), W("me","👈","y"), W("you","👉","y"), W("grandma","👵"), W("grandpa","👴"), W("sister","👧"), W("brother","👦"), W("baby","👶"), W("friend","🧑‍🤝‍🧑"), W("teacher","🧑‍🏫"), W("doctor","🧑‍⚕️"), W("nurse","👩‍⚕️"), W("family","👪"), W("love","❤️","g"), W("help","🛟","g"), W("where","📍","pu"), W("mine","🙋","y") ]),
       s_feel: sp("Feelings",[ W("happy","😊"), W("sad","😢"), W("mad","😠"), W("scared","😱"), W("tired","🥱"), W("excited","🤩"), W("silly","🤪"), W("calm","😌"), W("love","❤️"), W("surprised","😮"), W("frustrated","😤"), W("bored","😑"), W("proud","🥲"), W("shy","🙈"), W("okay","👌"), W("feel","💗","g"), W("I","🙋","y"), W("very","⬆️","b"), W("a little","🤏","b") ]),
-      s_body: sp("Body",[ W("head","🧠"), W("hair","💇"), W("eyes","👀"), W("ears","👂"), W("nose","👃"), W("mouth","👄"), W("teeth","🦷"), W("hand","✋"), W("arm","💪"), W("leg","🦵"), W("foot","🦶"), W("tummy","🫃"), W("back","🔙"), W("throat","🗣️"), W("hurt","🤕","g"), W("itchy","😖","b"), W("sick","🤢","b"), W("better","😊","b"), W("where","📍","pu") ]),
+      s_body: sp("Body",[ W("head","🧠"), W("hair","💇"), W("eyes","👀"), W("ears","👂"), W("nose","👃"), W("mouth","👄"), W("teeth","🦷"), W("hand","✋"), W("arm","💪"), W("leg","🦵"), W("foot","🦶"), W("tummy","🫃"), W("back","🔙"), W("throat","🗣️"), W("shoulders","🤷"), W("knees","🧎"), W("toes","🐾"), W("hurt","🤕","g"), W("itchy","😖","b"), W("sick","🤢","b"), W("better","😊","b"), W("where","📍","pu") ]),
       s_clothes: sp("Clothes",[ W("shirt","👕"), W("pants","👖"), W("shoes","👟"), W("socks","🧦"), W("coat","🧥"), W("hat","🧢"), W("underwear","🩲"), W("pajamas","🩳"), W("dress","👗"), W("boots","🥾"), W("gloves","🧤"), W("diaper","🧷"), W("put on","👕","g"), W("take off","🙅","g"), W("wet","💧","b"), W("dry","☀️","b"), W("dirty","🟤","b"), W("warm","🌡️","b") ]),
       s_places: sp("Places",[ W("home","🏠"), W("school","🏫"), W("store","🏪"), W("park","🌳"), W("bathroom","🚽"), W("kitchen","🍳"), W("bedroom","🛏️"), W("outside","🌳"), W("inside","🏠"), W("car","🚗"), W("doctor","🏥"), W("restaurant","🍴"), W("playground","🛝"), W("grandma's","👵"), W("go","🚦","g"), W("want","🤲","g"), W("here","📍","w"), W("where","📍","pu") ]),
       s_play: sp("Play",[ W("ball","⚽"), W("blocks","🧱"), W("book","📖"), W("cars","🚗"), W("doll","🪆"), W("puzzle","🧩"), W("bubbles","🫧"), W("crayons","🖍️"), W("game","🎮"), W("music","🎵"), W("tablet","📱"), W("TV","📺"), W("swing","🛝"), W("slide","🛝"), W("bike","🚲"), W("play","🎲","g"), W("want","🤲","g"), W("my turn","🙋","y"), W("again","🔁","b"), W("fun","😄","b") ]),
@@ -377,7 +400,6 @@ function markMilestone(key, msg, say){
   if (board.milestones[key]) return false;
   board.milestones[key] = Date.now(); save();
   toast("🎉 " + msg);
-  if (say) setTimeout(function(){ speak(say); }, 450);
   return true;
 }
 function checkWordMilestones(){
@@ -394,15 +416,17 @@ function logWord(w){
     var lg = getLog();
     lg.push({ w:w, t:Date.now() });
     var cutoff = Date.now() - 60*864e5;              /* keep 60 days */
-    if (lg.length > 8000 || lg[0] && lg[0].t < cutoff){
-      lg = lg.filter(function(e){ return e.t >= cutoff; }).slice(-8000);
+    if (lg.length > 20000 || lg[0] && lg[0].t < cutoff){
+      lg = lg.filter(function(e){ return e.t >= cutoff; }).slice(-20000);
     }
     var lj = JSON.stringify(lg);
     localStorage.setItem(LOG_KEY, lj);
     idbSet(LOG_KEY, lj);
   } catch(e){}
   queueUsage(w);
-  try { checkWordMilestones(); } catch(e){}
+  try { liveSend(w); } catch(e){}
+  logWord._n = (logWord._n || 0) + 1;
+  if (logWord._n % 5 === 0){ try { checkWordMilestones(); } catch(e){} }
 }
 
 /* ---------- durable storage mirror (IndexedDB survives iOS cache cleanups) ---------- */
@@ -452,10 +476,26 @@ function ensureShape(){
   if (!board.settings.size) board.settings.size = "fit";
   if (board.settings.hold === undefined) board.settings.hold = 0;
   if (!board.stories) board.stories = [];
+  if (!board.storiesSeeded){
+    if (!board.stories.length){
+      board.stories.push({
+        title: "Example story: A Good Day",
+        text: "I want to play. I eat a cookie. I drink juice. I feel happy."
+      });
+      board.stories.push({
+        title: "Example song: Head Shoulders Knees and Toes",
+        text: "Head shoulders knees and toes knees and toes. Head shoulders knees and toes knees and toes. And eyes and ears and mouth and nose. Head shoulders knees and toes knees and toes."
+      });
+    }
+    board.storiesSeeded = true;
+  }
   if (board.settings.storyPrompts === undefined) board.settings.storyPrompts = true;
   if (board.settings.vol === undefined) board.settings.vol = 1;
-  if (board.settings.volMax === undefined) board.settings.volMax = 1;
-  if (board.settings.volMin === undefined) board.settings.volMin = 0.15;
+  if (!board.limits) board.limits = {};
+  if (board.limits.volMax === undefined) board.limits.volMax = (board.settings.volMax !== undefined ? board.settings.volMax : 1);
+  if (board.limits.volMin === undefined) board.limits.volMin = (board.settings.volMin !== undefined ? board.settings.volMin : 0.15);
+  if (board.liveFeed === undefined) board.liveFeed = false;
+  if (board.settings.clearRemind === undefined) board.settings.clearRemind = false;
   if (!board.settings.kbLayout) board.settings.kbLayout = "qwerty";
   if (!board.settings.routineLevel) board.settings.routineLevel = 1;
   if (!board.fspFix){
@@ -471,6 +511,8 @@ var cur = "home", stack = [], sent = [], editing = false, spellBuf = "";
 /* ---------- speech ---------- */
 var SPELL_OK = { "TV":1, "OK":1, "DVD":1, "ABC":1 };   /* things that SHOULD be spelled out */
 function fixSpeech(t){
+  var lone = String(t).trim();
+  if (/^[A-Z]$/.test(lone)) return lone.toLowerCase();   /* lone capital letter: stops voices saying "capital I" */
   return String(t).split(" ").map(function(w){
     var core = w.replace(/[^A-Za-z]/g, "");
     if (core.length > 1 && core === core.toUpperCase() && !SPELL_OK[core]) return w.toLowerCase();
@@ -712,7 +754,34 @@ function goBack(){
   if (stack.length){ cur = stack.pop(); } else { cur = "home"; }
   render();
 }
+var clearTimer = null;
+function flashClear(){
+  var cells = board.pages[cur] ? board.pages[cur].cells : {};
+  Object.keys(cells).forEach(function(ci){
+    var b = cells[ci];
+    if (b.t === "a" && b.a === "clear"){
+      var el = grid.querySelector('[data-idx="' + ci + '"]');
+      if (el){
+        el.classList.remove("flash-clear"); void el.offsetWidth;
+        el.classList.add("flash-clear");
+        setTimeout(function(){ el.classList.remove("flash-clear"); }, 2600);
+      }
+    }
+  });
+  var tb = document.getElementById("clr");
+  tb.classList.remove("flash-clear"); void tb.offsetWidth;
+  tb.classList.add("flash-clear");
+  setTimeout(function(){ tb.classList.remove("flash-clear"); }, 2600);
+}
+function scheduleClearReminder(){
+  clearTimeout(clearTimer);
+  if (!board.settings.clearRemind) return;
+  clearTimer = setTimeout(function(){
+    if (sent.length) flashClear();
+  }, 120000);
+}
 function renderSent(){
+  if (!sent.length) clearTimeout(clearTimer);
   sentEl.innerHTML = "";
   if (!sent.length){ sentEl.innerHTML = '<span class="hint">Tap words to talk…</span>'; return; }
   sent.forEach(function(it, i){
@@ -732,7 +801,11 @@ function renderSent(){
 }
 
 document.getElementById("spk").addEventListener("click", function(){
-  if (sent.length){ playItems(sent); if (sent.length >= 2) markMilestone("firstCombo", "First time combining words! 🌟", "You put words together!"); }
+  if (sent.length){
+    playItems(sent);
+    if (sent.length >= 2) markMilestone("firstCombo", "First time combining words! 🌟", "You put words together!");
+    scheduleClearReminder();
+  }
 });
 document.getElementById("clr").addEventListener("click", function(){ sent=[]; renderSent(); });
 document.getElementById("bsp").addEventListener("click", function(){ sent.pop(); renderSent(); });
@@ -1530,6 +1603,8 @@ function startListen(){
         board = nb;
         try { localStorage.setItem(LS_KEY, JSON.stringify(board)); } catch(e){}
         if (!board.pages[cur]){ cur = "home"; stack = []; }
+        try { clampVol(); } catch(e){}
+        if (!board.pages[cur]){ cur = "home"; }
         renderSent(); render();
         setStatus("Synced ✓"); toast("Board updated ✓");
         applyingRemote = false;
@@ -1556,6 +1631,45 @@ function flushUsage(){
   usageBuf = {};
   var ref = db.collection("families").doc(dev.code).collection("usage").doc(dev.id+"_"+day);
   ref.set({ d: day }, { merge: true }).then(function(){ return ref.update(upd); }).catch(function(){});
+}
+/* ---------- live feed: parent sees recent spoken words (family-wide toggle) ---------- */
+var liveBuf = [], liveUnsub = null;
+function liveSend(w){
+  if (!syncOn || !db || !board.liveFeed || dev.role === "parent") return;
+  liveBuf.push({ w: w, t: Date.now() });
+  if (liveBuf.length > 20) liveBuf = liveBuf.slice(-20);
+  try {
+    db.collection("families").doc(dev.code).collection("live").doc(dev.id)
+      .set({ items: liveBuf, t: Date.now() });
+  } catch(e){}
+}
+function openLive(){
+  if (!syncOn || !db){ toast("Connect to your family first (Account & sync)."); openSettings(); return; }
+  function renderLive(rows){
+    var html = rows.length ? rows.map(function(it){
+      var d = new Date(it.t);
+      return '<div style="display:flex;gap:10px;align-items:center;padding:7px 10px;background:var(--soft);border-radius:10px;margin:4px 0"><span style="color:var(--muted);font-size:12px">' +
+        d.getHours() + ':' + ("0"+d.getMinutes()).slice(-2) + '</span><b style="font-size:15px">' + esc(it.w) + '</b></div>';
+    }).join("") : '<div class="note">Nothing yet — when enabled, words appear here moments after they are spoken on the child\u2019s device.</div>';
+    openOv('<h3>👂 Live feed</h3>' +
+      '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="lft"'+(board.liveFeed?" checked":"")+' style="width:auto"> Live feed on (applies to the whole family)</label>' +
+      '<div class="note">Shares the child\u2019s most recent spoken words with connected parent devices. Turn it off any time \u2014 as children grow, their privacy matters too.</div>' +
+      '<label>Most recent words</label>' + html +
+      '<div class="btnrow"><button class="btn" id="lfc">Close</button></div>');
+    ovbox.querySelector("#lft").addEventListener("change", function(){ board.liveFeed = this.checked; save(); });
+    ovbox.querySelector("#lfc").addEventListener("click", function(){
+      if (liveUnsub){ liveUnsub(); liveUnsub = null; }
+      openSettings();
+    });
+  }
+  renderLive([]);
+  if (liveUnsub) liveUnsub();
+  liveUnsub = db.collection("families").doc(dev.code).collection("live").onSnapshot(function(q){
+    var rows = [];
+    q.forEach(function(ds){ (ds.data().items || []).forEach(function(it){ rows.push(it); }); });
+    rows.sort(function(a, b){ return b.t - a.t; });
+    renderLive(rows.slice(0, 20));
+  }, function(){});
 }
 function newFamilyCode(){
   var a = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", c = "";
@@ -1657,9 +1771,23 @@ function openAccountDlg(mode){
     '<div class="note" id="acMsg"></div>' +
     '<div class="btnrow"><button class="btn primary" id="acGo">'+(isUp?"Create account":"Sign in")+'</button></div>' +
     '<div class="btnrow"><button class="btn ghost" id="acGoogle">Continue with Google</button></div>' +
+    (isUp ? '' : '<div class="note" style="text-align:center"><a href="#" id="acForgot" style="color:var(--accent)">Forgot password?</a></div>') +
     '<div class="btnrow"><button class="btn" id="acBack">Back</button><button class="btn ghost" id="acSwitch">'+(isUp?"I already have one":"Create one instead")+'</button></div>');
   ovbox.querySelector("#acBack").addEventListener("click", openSyncDlg);
   ovbox.querySelector("#acSwitch").addEventListener("click", function(){ openAccountDlg(isUp?"signin":"signup"); });
+  var fg = ovbox.querySelector("#acForgot");
+  if (fg) fg.addEventListener("click", function(e){
+    e.preventDefault();
+    var em = ovbox.querySelector("#acEmail").value.trim();
+    var msg = ovbox.querySelector("#acMsg");
+    if (!em){ msg.textContent = "Type your email above first, then tap Forgot password."; return; }
+    initFirebase(function(err){
+      if (err){ msg.textContent = err; return; }
+      firebase.auth().sendPasswordResetEmail(em).then(function(){
+        msg.textContent = "Reset email sent to " + em + " — check the inbox (and spam folder).";
+      }).catch(function(e2){ msg.textContent = friendlyAuth(e2); });
+    });
+  });
   ovbox.querySelector("#acGo").addEventListener("click", function(){
     var em = ovbox.querySelector("#acEmail").value.trim(), pw = ovbox.querySelector("#acPass").value, msg = ovbox.querySelector("#acMsg");
     if (!em || pw.length < 6){ msg.textContent = "Enter an email and a password of at least 6 characters."; return; }
@@ -1722,7 +1850,8 @@ function remoteReport(){
       '<p class="sub">'+totT+' words spoken this week'+(totL ? ' ('+totL+' last week)' : '')+'</p>' +
       '<label>Words per day</label><div style="display:flex;align-items:flex-end;gap:4px;height:74px">'+days+'</div>' +
       '<label>Most used words</label>'+topHtml +
-      '<label>Target words</label>'+tHtml +
+      milestonesHtml() +
+    '<label>Target words</label>'+tHtml +
       '<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="ntw" placeholder="Add a target word…" style="flex:1"><button class="btn primary" id="ntwa" style="flex:0 0 auto;padding:8px 14px">＋</button></div>' +
       '<div class="btnrow"><button class="btn" id="rb">Back</button></div>');
     Array.prototype.forEach.call(ovbox.querySelectorAll(".tdel"), function(bt){
@@ -1741,9 +1870,26 @@ function remoteReport(){
   });
 }
 
+/* ---------- milestone trophy case (shown in reports, not spoken) ---------- */
+function milestonesHtml(){
+  if (!board.milestones) return "";
+  var names = { firstCombo: "First word combination 🌟" };
+  [10,25,50,100,200,300].forEach(function(n){ names["words"+n] = n + " different words"; });
+  var keys = Object.keys(board.milestones).filter(function(k){ return names[k]; });
+  if (!keys.length) return "";
+  keys.sort(function(a, b){ return board.milestones[a] - board.milestones[b]; });
+  return '<label>🏆 Milestones</label>' + keys.map(function(k){
+    var d = new Date(board.milestones[k]);
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--soft);border-radius:10px;margin:3px 0;font-size:13px"><b>' +
+      names[k] + '</b><span style="color:var(--muted)">' + (d.getMonth()+1) + "/" + d.getDate() + '</span></div>';
+  }).join("");
+}
+
 /* ---------- detailed analytics ---------- */
 function deepReport(){
-  var log = getLog(), now = Date.now(), wk = 7*864e5;
+  var now = Date.now(), wk = 7*864e5;
+  var fullLog = getLog();
+  var log = fullLog.filter(function(e){ return e.t > now - 30*864e5; });
   var total = log.length;
   var cAll = {}, cW = {}, firstSeen = {};
   log.forEach(function(e){
@@ -1771,18 +1917,18 @@ function deepReport(){
     return '<div style="display:flex;align-items:center;gap:8px;margin:2px 0"><div style="width:90px;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(w)+'</div><div style="flex:1;height:11px;background:var(--soft);border-radius:99px"><div style="height:11px;border-radius:99px;background:var(--accent);width:'+Math.max(4, Math.round(cAll[w]/maxT*100))+'%"></div></div><div style="width:34px;text-align:right;font-size:12px">'+cAll[w]+'</div></div>';
   }).join("") || '<div class="note">No taps recorded on this device yet.</div>';
   function stat(n, l){ return '<div style="flex:1;background:var(--soft);border-radius:12px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--accent)">'+n+'</div><div style="font-size:11px;color:var(--muted)">'+l+'</div></div>'; }
-  openOv('<h3>🔎 Detailed report</h3><p class="sub">Everything this device recorded (last 60 days). Made for parents, teachers, and SLPs.</p>' +
+  openOv('<h3>🔎 Detailed report</h3><p class="sub">The last 30 days on this device — made for parents, teachers, and SLPs. (CSV export includes the full 60-day record.)</p>' +
     '<div style="display:flex;gap:8px">'+stat(total,"total taps")+stat(uniqAll,"different words")+stat(avg,"taps / active day")+'</div>' +
     '<div style="display:flex;gap:8px;margin-top:8px">'+stat(uniqW,"words this week")+stat(newW.length,"new this week")+stat(dayN,"active days")+'</div>' +
     (newW.length ? '<label>New words this week</label><div style="font-size:13px">'+newW.map(esc).join(", ")+'</div>' : '') +
     '<label>Time of day (hour, all taps)</label><div style="display:flex;align-items:flex-end;gap:3px;height:62px">'+hBars+'</div>' +
-    '<label>Top 20 words (all time)</label>'+topHtml +
+    '<label>Top 20 words (last 30 days)</label>'+topHtml +
     '<div class="btnrow"><button class="btn ghost" id="dcsv">⬇ Export CSV for specialists</button></div>' +
     '<div class="btnrow"><button class="btn" id="drb">Back</button></div>');
   ovbox.querySelector("#drb").addEventListener("click", openReport);
   ovbox.querySelector("#dcsv").addEventListener("click", function(){
     var rows = ["word,timestamp"];
-    log.forEach(function(e){ rows.push('"' + String(e.w).replace(/"/g,'""') + '",' + new Date(e.t).toISOString()); });
+    fullLog.forEach(function(e){ rows.push('"' + String(e.w).replace(/"/g,'""') + '",' + new Date(e.t).toISOString()); });
     var blob = new Blob([rows.join("\n")], { type: "text/csv" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1849,6 +1995,7 @@ function openReport(){
     (growthPct!==null?'<div style="font-size:13px;margin-top:4px;color:'+(growthPct>=0?'var(--good)':'var(--muted)')+'">'+(growthPct>=0?'▲ '+growthPct+'% more than last week':'every week looks different — keep modeling')+'</div>':'') +
     '<label>Words per day</label><div style="display:flex;align-items:flex-end;gap:4px;height:74px">'+days+'</div>' +
     '<label>Most used words</label>'+topHtml +
+    milestonesHtml() +
     '<label>Target words</label>'+tHtml +
     '<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="ntw" placeholder="Add a target word…" style="flex:1"><button class="btn primary" id="ntwa" style="flex:0 0 auto;padding:8px 14px">＋</button></div>' +
     '<div class="btnrow"><button class="btn" id="rb">Back</button></div>');
@@ -2118,9 +2265,9 @@ function startWordGuide(word){
 
 /* ---------- child-safe volume ---------- */
 function clampVol(){
-  var s = board.settings;
-  if (s.volMin > s.volMax) s.volMin = s.volMax;
-  s.vol = Math.min(s.volMax, Math.max(s.volMin, s.vol));
+  var L = board.limits || { volMin: 0, volMax: 1 };
+  if (L.volMin > L.volMax) L.volMin = L.volMax;
+  board.settings.vol = Math.min(L.volMax, Math.max(L.volMin, board.settings.vol));
 }
 document.getElementById("volBtn").addEventListener("click", openVolume);
 function openVolume(){
@@ -2133,7 +2280,8 @@ function openVolume(){
     '<div class="btnrow"><button class="btn primary" id="vDone">Done</button></div>');
   function step(d){
     var v = Math.round((board.settings.vol + d) * 10) / 10;
-    board.settings.vol = Math.min(board.settings.volMax, Math.max(board.settings.volMin, v));
+    var L = board.limits || { volMin: 0, volMax: 1 };
+    board.settings.vol = Math.min(L.volMax, Math.max(L.volMin, v));
     save();
     ovbox.querySelector("#volShow").textContent = pct();
     speak("Volume " + Math.round(board.settings.vol * 100) + " percent");
@@ -2343,6 +2491,7 @@ function openSettings(){
     '<button class="btn ghost" id="rep" style="width:100%;margin-top:6px">📊 Weekly report &amp; target words</button>' +
     '<button class="btn ghost" id="syncb" style="width:100%;margin-top:6px">☁ Phone sync '+(syncOn ? "· connected ✓" : "· set up")+'</button>' +
     '<button class="btn ghost" id="coachb" style="width:100%;margin-top:6px">🧭 Model With Me — routine coach</button>' +
+    '<button class="btn ghost" id="liveb" style="width:100%;margin-top:6px">👂 Live feed '+(board.liveFeed ? "· on" : "· off")+'</button>' +
     '<label>Routine level — how routines build up</label><select id="rlv">' +
       '<option value="1"'+((board.settings.routineLevel||1)===1?" selected":"")+'>Single words</option>' +
       '<option value="2"'+(board.settings.routineLevel===2?" selected":"")+'>Short phrases</option>' +
@@ -2354,6 +2503,7 @@ function openSettings(){
     '<label>Speaking speed: <span id="rvv">'+board.settings.rate.toFixed(1)+'</span>×</label>' +
     '<input type="range" id="sr" min="0.5" max="1.4" step="0.1" value="'+board.settings.rate+'">' +
     '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="si"'+(board.settings.instant?" checked":"")+' style="width:auto"> Speak each word when tapped</label>' +
+    '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="scr"'+(board.settings.clearRemind?" checked":"")+' style="width:auto"> Clear reminder — 2 minutes after speaking, flash the CLEAR button</label>' +
     '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="sgp"'+(board.settings.storyPrompts!==false?" checked":"")+' style="width:auto"> Story voice prompts (“Find …”) — the glow always stays on</label>' +
     '<label>Button size</label><select id="bsz">' +
       '<option value="fit"'+(board.settings.size==="fit"?" selected":"")+'>Fit screen (whole board visible — like LAMP)</option>' +
@@ -2367,10 +2517,10 @@ function openSettings(){
     '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="shc"'+(dev.contrast?" checked":"")+' style="width:auto"> High-contrast mode (bold outlines, black text — easier to see)</label>' +
     '<button class="btn ghost" id="tv" style="width:100%;margin-top:10px">▶ Test voice</button>' +
     '<hr style="border:none;border-top:1px solid var(--soft);margin:16px 0">' +
-    '<label>Loudest allowed: <span id="vxv">'+Math.round(board.settings.volMax*100)+'%</span></label>' +
-    '<input type="range" id="svx" min="0.3" max="1" step="0.1" value="'+board.settings.volMax+'">' +
-    '<label>Quietest allowed: <span id="vnv">'+Math.round(board.settings.volMin*100)+'%</span></label>' +
-    '<input type="range" id="svn" min="0" max="0.8" step="0.05" value="'+board.settings.volMin+'">' +
+    '<label>Loudest allowed: <span id="vxv">'+Math.round(board.limits.volMax*100)+'%</span></label>' +
+    '<input type="range" id="svx" min="0.3" max="1" step="0.1" value="'+board.limits.volMax+'">' +
+    '<label>Quietest allowed: <span id="vnv">'+Math.round(board.limits.volMin*100)+'%</span></label>' +
+    '<input type="range" id="svn" min="0" max="0.8" step="0.05" value="'+board.limits.volMin+'">' +
     '<div class="note">The 🔊 button on the board can only move volume between these limits — 100 taps can’t break them.</div>' +
     '<button class="btn ghost" id="printb" style="width:100%;margin-top:10px">🖨 Print low-tech backup</button>' +
     '<button class="btn ghost" id="bulk" style="width:100%">🖼️ Get real symbols for all buttons (ARASAAC)</button>' +
@@ -2381,18 +2531,20 @@ function openSettings(){
   ovbox.querySelector("#rep").addEventListener("click", openReport);
   ovbox.querySelector("#syncb").addEventListener("click", openSyncDlg);
   ovbox.querySelector("#coachb").addEventListener("click", openCoach);
+  ovbox.querySelector("#liveb").addEventListener("click", openLive);
   ovbox.querySelector("#rlv").addEventListener("change", function(){ board.settings.routineLevel = parseInt(this.value,10); save(); });
   ovbox.querySelector("#vv").addEventListener("change", function(){ board.settings.voice = this.value; save(); });
   ovbox.querySelector("#sp").addEventListener("input", function(){ board.settings.pitch = parseFloat(this.value); ovbox.querySelector("#pvv").textContent = board.settings.pitch.toFixed(1); save(); });
   ovbox.querySelector("#sr").addEventListener("input", function(){ board.settings.rate = parseFloat(this.value); ovbox.querySelector("#rvv").textContent = board.settings.rate.toFixed(1); save(); });
   ovbox.querySelector("#si").addEventListener("change", function(){ board.settings.instant = this.checked; save(); });
+  ovbox.querySelector("#scr").addEventListener("change", function(){ board.settings.clearRemind = this.checked; save(); });
   ovbox.querySelector("#sgp").addEventListener("change", function(){ board.settings.storyPrompts = this.checked; save(); });
   ovbox.querySelector("#bsz").addEventListener("change", function(){ board.settings.size = this.value; save(); render(); });
   ovbox.querySelector("#bhold").addEventListener("change", function(){ board.settings.hold = parseInt(this.value,10); save(); });
   ovbox.querySelector("#shc").addEventListener("change", function(){ dev.contrast = this.checked; saveDev(); applyTheme(); render(); });
   ovbox.querySelector("#tv").addEventListener("click", function(){ speak("Hi! I want to play outside."); });
-  ovbox.querySelector("#svx").addEventListener("input", function(){ board.settings.volMax = parseFloat(this.value); clampVol(); ovbox.querySelector("#vxv").textContent = Math.round(board.settings.volMax*100)+"%"; save(); });
-  ovbox.querySelector("#svn").addEventListener("input", function(){ board.settings.volMin = parseFloat(this.value); clampVol(); ovbox.querySelector("#vnv").textContent = Math.round(board.settings.volMin*100)+"%"; save(); });
+  ovbox.querySelector("#svx").addEventListener("input", function(){ board.limits.volMax = parseFloat(this.value); clampVol(); ovbox.querySelector("#vxv").textContent = Math.round(board.limits.volMax*100)+"%"; save(); });
+  ovbox.querySelector("#svn").addEventListener("input", function(){ board.limits.volMin = parseFloat(this.value); clampVol(); ovbox.querySelector("#vnv").textContent = Math.round(board.limits.volMin*100)+"%"; save(); });
   ovbox.querySelector("#printb").addEventListener("click", printBoard);
   ovbox.querySelector("#bulk").addEventListener("click", bulkSymbols);
   ovbox.querySelector("#exp").addEventListener("click", exportBoard);
