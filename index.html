@@ -239,11 +239,9 @@ var PAL = {
   r:  ["#ffcfc2","#f39882","#47261c","#714035"],   /* red              */
   gr: ["#e8ecf2","#c8d0dc","#2b303c","#414857"]    /* gray             */
 };
-function curTheme(){ return (board && board.settings && board.settings.theme) || (dev && dev.theme) || "light"; }
-function curContrast(){ if (board && board.settings && board.settings.contrast !== undefined) return board.settings.contrast; return !!(dev && dev.contrast); }
 function palColors(key){
   var col = PAL[key] || PAL.w;
-  var dark = curTheme() === "dark";
+  var dark = dev && dev.theme === "dark";
   return [ dark ? col[2] : col[0], dark ? col[3] : col[1] ];
 }
 
@@ -459,8 +457,6 @@ function ensureShape(){
   if (board.settings.volMax === undefined) board.settings.volMax = 1;
   if (board.settings.volMin === undefined) board.settings.volMin = 0.15;
   if (!board.settings.kbLayout) board.settings.kbLayout = "qwerty";
-  if (!board.settings.theme) board.settings.theme = (dev && dev.theme) || "light";
-  if (board.settings.contrast === undefined) board.settings.contrast = !!(dev && dev.contrast);
   if (!board.settings.routineLevel) board.settings.routineLevel = 1;
   if (!board.fspFix){
     Object.keys(board.pages).forEach(function(pk){
@@ -475,6 +471,8 @@ var cur = "home", stack = [], sent = [], editing = false, spellBuf = "";
 /* ---------- speech ---------- */
 var SPELL_OK = { "TV":1, "OK":1, "DVD":1, "ABC":1 };   /* things that SHOULD be spelled out */
 function fixSpeech(t){
+  var lone = String(t).trim();
+  if (/^[A-Z]$/.test(lone)) return lone.toLowerCase();   /* lone capital letter: stops voices saying "capital I" */
   return String(t).split(" ").map(function(w){
     var core = w.replace(/[^A-Za-z]/g, "");
     if (core.length > 1 && core === core.toUpperCase() && !SPELL_OK[core]) return w.toLowerCase();
@@ -1290,16 +1288,14 @@ function saveDev(){
   idbSet(DEV_KEY, j);
 }
 function applyTheme(){
-  var th = curTheme();
-  document.body.classList.toggle("dark", th === "dark");
-  document.body.classList.toggle("hc", !!curContrast());
+  document.body.classList.toggle("dark", dev.theme === "dark");
+  document.body.classList.toggle("hc", !!dev.contrast);
   var tb = document.getElementById("themeBtn");
-  if (tb) tb.textContent = th === "dark" ? "☀️" : "🌙";
+  if (tb) tb.textContent = dev.theme === "dark" ? "☀️" : "🌙";
 }
 document.getElementById("themeBtn").addEventListener("click", function(){
-  if (!board || !board.settings){ return; }
-  board.settings.theme = (curTheme() === "dark") ? "light" : "dark";
-  save(); applyTheme(); render();
+  dev.theme = dev.theme === "dark" ? "light" : "dark";
+  saveDev(); applyTheme(); render();
 });
 function dkey(d){ return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2); }
 function safeKey(w){ return String(w).replace(/[.#$/\[\]]/g,"_").slice(0,40); }
@@ -1446,8 +1442,7 @@ function stripMedia(){
       if (b.au && b.auId){ media[b.auId] = b.au; cb2.au = null; cb2.auRef = b.auId; }
     });
   });
-  if (clean.settings) delete clean.settings.vol;   /* volume level stays per-device (inside synced limits) */
-  delete clean.pin;                                 /* each device keeps its own PIN */
+  delete clean.settings; delete clean.pin;
   return { clean: clean, media: media };
 }
 function resolveMedia(clean, cb){
@@ -1532,22 +1527,11 @@ function startListen(){
       var clean = JSON.parse(d.board);
       applyingRemote = true;
       resolveMedia(clean, function(nb){
-        nb.pin = board.pin;
-        if (!nb.settings){ nb.settings = board.settings; }
-        else {
-          nb.settings.vol = board.settings.vol;
-          if (voices.length && nb.settings.voice){
-            var vOk = false;
-            for (var vi = 0; vi < voices.length; vi++){ if (voices[vi].name === nb.settings.voice) vOk = true; }
-            if (!vOk) nb.settings.voice = board.settings.voice;
-          }
-        }
+        nb.settings = board.settings; nb.pin = board.pin;
         if (!nb.targets) nb.targets = board.targets || [];
         board = nb;
-        try { ensureShape(); } catch(e){}
         try { localStorage.setItem(LS_KEY, JSON.stringify(board)); } catch(e){}
         if (!board.pages[cur]){ cur = "home"; stack = []; }
-        applyTheme();
         renderSent(); render();
         setStatus("Synced ✓"); toast("Board updated ✓");
         applyingRemote = false;
@@ -1597,14 +1581,17 @@ function connectFamily(mode, code, cb){
 function openSyncDlg(){
   var cu = (window.firebase && firebase.auth && firebase.auth().currentUser) || null;
   var emailUser = (cu && !cu.isAnonymous) ? (cu.email || "your account") : null;
+  var isParent = dev.role === "parent";
   var acctHtml = emailUser
-    ? '<div style="background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px">✓ Signed in as <b>'+esc(emailUser)+'</b> — your board is backed up to your account and can be restored on any device.</div>' +
+    ? '<div style="background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px">✓ Signed in as <b>'+esc(emailUser)+'</b> — this board is backed up to your account and can be restored on any device.</div>' +
       '<div class="btnrow"><button class="btn ghost" id="acSignOut">Sign out</button></div>'
-    : '<div class="note">💾 Create a free account to back up your board and restore it on any device — even if you lose your family code.</div>' +
-      '<div class="btnrow"><button class="btn primary" id="acCreate">Create free account</button><button class="btn ghost" id="acSignIn">Sign in</button></div>';
+    : (isParent
+      ? '<div style="background:var(--tipbg);border:1px solid var(--tipborder);border-radius:12px;padding:10px 12px;font-size:13px">🛡️ <b>Protect this board.</b> Create a free account so that if you ever lose your family code — or your phone — signing in with your email brings everything back exactly as it was.</div>' +
+        '<div class="btnrow"><button class="btn primary" id="acCreate">Create free account</button><button class="btn ghost" id="acSignIn">Sign in</button></div>'
+      : "");
   var connected = syncOn && dev.code;
   openOv('<h3>☁ Account &amp; sync</h3>' + acctHtml +
-    '<hr style="border:none;border-top:1px solid var(--soft);margin:14px 0">' +
+    (acctHtml ? '<hr style="border:none;border-top:1px solid var(--soft);margin:14px 0">' : '') +
     (connected
       ? '<p class="sub">Connected to family <b style="font-size:17px;letter-spacing:2px">'+esc(dev.code)+'</b> as <b>'+(dev.role==="parent"?"parent phone":"child device")+'</b>. Edits sync automatically. Enter this code on other devices to join.</p>' +
         '<div class="btnrow"><button class="btn danger" id="sydis">Disconnect this device</button></div>' +
@@ -1668,6 +1655,7 @@ function openAccountDlg(mode){
     '<p class="sub">'+(isUp?"Back up your board and restore it on any device — even if you lose your family code. Free forever.":"Sign in to restore your board on this device.")+'</p>' +
     '<label>Email</label><input type="email" id="acEmail" autocomplete="email" placeholder="you@example.com">' +
     '<label>Password</label><input type="password" id="acPass" placeholder="at least 6 characters">' +
+    '<div class="note">By continuing you agree to the <a href="privacy.html" target="_blank" style="color:var(--accent)">privacy &amp; data policy</a>. No ads, no tracking, no selling data — ever.</div>' +
     '<div class="note" id="acMsg"></div>' +
     '<div class="btnrow"><button class="btn primary" id="acGo">'+(isUp?"Create account":"Sign in")+'</button></div>' +
     '<div class="btnrow"><button class="btn ghost" id="acGoogle">Continue with Google</button></div>' +
@@ -2361,7 +2349,6 @@ function openSettings(){
       '<option value="1"'+((board.settings.routineLevel||1)===1?" selected":"")+'>Single words</option>' +
       '<option value="2"'+(board.settings.routineLevel===2?" selected":"")+'>Short phrases</option>' +
       '<option value="3"'+(board.settings.routineLevel===3?" selected":"")+'>Sentences</option></select>' +
-    '<div class="note" style="margin-top:8px">These settings sync to every family device — you can tune the child\u2019s setup from your phone. Volume level and the PIN stay per-device.</div>' +
     '<label>Voice</label><select id="vv">'+vopts+'</select>' +
     '<div class="note">Tip: on iPad, download a free “Enhanced” voice in Settings → Accessibility → Spoken Content → Voices for a much more natural child voice — it will appear in this list.</div>' +
     '<label>Voice pitch: <span id="pvv">'+board.settings.pitch.toFixed(1)+'</span> (higher = younger)</label>' +
@@ -2379,7 +2366,7 @@ function openSettings(){
       '<option value="300"'+(board.settings.hold===300?" selected":"")+'>Short hold (0.3s)</option>' +
       '<option value="600"'+(board.settings.hold===600?" selected":"")+'>Long hold (0.6s)</option></select>' +
     '<div class="note">Hold-to-select ignores quick accidental brushes — a button only speaks when pressed deliberately. Both settings are per-device, so they won’t change other devices.</div>' +
-    '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="shc"'+(curContrast()?" checked":"")+' style="width:auto"> High-contrast mode (bold outlines, black text — easier to see)</label>' +
+    '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="shc"'+(dev.contrast?" checked":"")+' style="width:auto"> High-contrast mode (bold outlines, black text — easier to see)</label>' +
     '<button class="btn ghost" id="tv" style="width:100%;margin-top:10px">▶ Test voice</button>' +
     '<hr style="border:none;border-top:1px solid var(--soft);margin:16px 0">' +
     '<label>Loudest allowed: <span id="vxv">'+Math.round(board.settings.volMax*100)+'%</span></label>' +
@@ -2391,6 +2378,7 @@ function openSettings(){
     '<button class="btn ghost" id="bulk" style="width:100%">🖼️ Get real symbols for all buttons (ARASAAC)</button>' +
     '<div class="btnrow"><button class="btn ghost" id="exp">⬇ Export backup</button><button class="btn ghost" id="imp">⬆ Import</button></div>' +
     '<div class="btnrow"><button class="btn ghost" id="pinc">Change PIN</button><button class="btn ghost" id="rst">Reset board…</button></div>' +
+    '<div class="note" style="text-align:center;margin-top:10px"><a href="privacy.html" target="_blank" style="color:var(--muted)">Privacy &amp; data policy</a></div>' +
     '<div class="btnrow"><button class="btn primary" id="sd">Done</button></div>');
   ovbox.querySelector("#rep").addEventListener("click", openReport);
   ovbox.querySelector("#syncb").addEventListener("click", openSyncDlg);
@@ -2448,7 +2436,7 @@ document.getElementById("importIn").addEventListener("change", function(){
     try {
       var nb = JSON.parse(fr.result);
       if (!nb || !nb.pages || !nb.pages.home) throw 0;
-      board = nb; ensureShape(); applyTheme(); save(); cur="home"; stack=[]; sent=[]; renderSent(); render(); closeOv();
+      board = nb; ensureShape(); save(); cur="home"; stack=[]; sent=[]; renderSent(); render(); closeOv();
       toast("Board imported.");
     } catch(e){ toast("That file isn’t a TalkBoard backup."); }
   };
@@ -2458,9 +2446,9 @@ document.getElementById("importIn").addEventListener("change", function(){
 /* ---------- init: open durable store, restore if needed, then start ---------- */
 function startApp(){
   loadDev();
+  applyTheme();
   load();
   ensureShape();
-  applyTheme();
   renderSent();
   render();
   if (dev.fb && dev.code){
