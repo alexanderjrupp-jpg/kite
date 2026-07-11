@@ -1650,6 +1650,7 @@ function openAccountDlg(mode){
     '<p class="sub">'+(isUp?"Back up your board and restore it on any device — even if you lose your family code. Free forever.":"Sign in to restore your board on this device.")+'</p>' +
     '<label>Email</label><input type="email" id="acEmail" autocomplete="email" placeholder="you@example.com">' +
     '<label>Password</label><input type="password" id="acPass" placeholder="at least 6 characters">' +
+    '<div class="note">By continuing you agree to the <a href="privacy.html" target="_blank" style="color:var(--accent)">privacy &amp; data policy</a>. No ads, no tracking, no selling data — ever.</div>' +
     '<div class="note" id="acMsg"></div>' +
     '<div class="btnrow"><button class="btn primary" id="acGo">'+(isUp?"Create account":"Sign in")+'</button></div>' +
     '<div class="btnrow"><button class="btn ghost" id="acGoogle">Continue with Google</button></div>' +
@@ -2372,6 +2373,7 @@ function openSettings(){
     '<button class="btn ghost" id="bulk" style="width:100%">🖼️ Get real symbols for all buttons (ARASAAC)</button>' +
     '<div class="btnrow"><button class="btn ghost" id="exp">⬇ Export backup</button><button class="btn ghost" id="imp">⬆ Import</button></div>' +
     '<div class="btnrow"><button class="btn ghost" id="pinc">Change PIN</button><button class="btn ghost" id="rst">Reset board…</button></div>' +
+    '<div class="note" style="text-align:center;margin-top:10px"><a href="privacy.html" target="_blank" style="color:var(--muted)">Privacy &amp; data policy</a></div>' +
     '<div class="btnrow"><button class="btn primary" id="sd">Done</button></div>');
   ovbox.querySelector("#rep").addEventListener("click", openReport);
   ovbox.querySelector("#syncb").addEventListener("click", openSyncDlg);
