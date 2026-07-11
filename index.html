@@ -1601,6 +1601,7 @@ function startListen(){
         nb.settings = board.settings; nb.pin = board.pin;
         if (!nb.targets) nb.targets = board.targets || [];
         board = nb;
+        try { ensureShape(); } catch(e){}
         try { localStorage.setItem(LS_KEY, JSON.stringify(board)); } catch(e){}
         if (!board.pages[cur]){ cur = "home"; stack = []; }
         try { clampVol(); } catch(e){}
@@ -2481,6 +2482,7 @@ document.getElementById("setBtn").addEventListener("click", function(){
   askPin(openSettings);
 });
 function openSettings(){
+  if (!board.limits) board.limits = { volMin: 0.15, volMax: 1 };
   var vopts = '<option value="">System default</option>';
   var en = voices.filter(function(v){ return /^en/i.test(v.lang); });
   (en.length ? en : voices).forEach(function(v){
