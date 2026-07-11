@@ -497,6 +497,8 @@ function ensureShape(){
   if (board.liveFeed === undefined) board.liveFeed = false;
   if (board.settings.clearRemind === undefined) board.settings.clearRemind = false;
   if (!board.settings.kbLayout) board.settings.kbLayout = "qwerty";
+  if (!board.settings.theme) board.settings.theme = (dev && dev.theme) || "light";
+  if (board.settings.contrast === undefined) board.settings.contrast = !!(dev && dev.contrast);
   if (!board.settings.routineLevel) board.settings.routineLevel = 1;
   if (!board.fspFix){
     Object.keys(board.pages).forEach(function(pk){
@@ -1359,14 +1361,17 @@ function saveDev(){
   idbSet(DEV_KEY, j);
 }
 function applyTheme(){
-  document.body.classList.toggle("dark", dev.theme === "dark");
-  document.body.classList.toggle("hc", !!dev.contrast);
+  var th = (board && board.settings && board.settings.theme) || (dev && dev.theme) || "light";
+  var hc = (board && board.settings && board.settings.contrast !== undefined) ? board.settings.contrast : !!(dev && dev.contrast);
+  document.body.classList.toggle("dark", th === "dark");
+  document.body.classList.toggle("hc", !!hc);
   var tb = document.getElementById("themeBtn");
-  if (tb) tb.textContent = dev.theme === "dark" ? "☀️" : "🌙";
+  if (tb) tb.textContent = th === "dark" ? "☀️" : "🌙";
 }
 document.getElementById("themeBtn").addEventListener("click", function(){
-  dev.theme = dev.theme === "dark" ? "light" : "dark";
-  saveDev(); applyTheme(); render();
+  if (!board || !board.settings){ return; }
+  board.settings.theme = ((board.settings.theme || (dev && dev.theme)) === "dark") ? "light" : "dark";
+  save(); applyTheme(); render();
 });
 function dkey(d){ return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2); }
 function safeKey(w){ return String(w).replace(/[.#$/\[\]]/g,"_").slice(0,40); }
@@ -1513,7 +1518,8 @@ function stripMedia(){
       if (b.au && b.auId){ media[b.auId] = b.au; cb2.au = null; cb2.auRef = b.auId; }
     });
   });
-  delete clean.settings; delete clean.pin;
+  if (clean.settings) delete clean.settings.vol;   /* volume level stays per-device (within synced limits) */
+  delete clean.pin;                                 /* each device keeps its own PIN */
   return { clean: clean, media: media };
 }
 function resolveMedia(clean, cb){
@@ -1598,10 +1604,19 @@ function startListen(){
       var clean = JSON.parse(d.board);
       applyingRemote = true;
       resolveMedia(clean, function(nb){
-        nb.settings = board.settings; nb.pin = board.pin;
+        nb.pin = board.pin;
+        if (!nb.settings){ nb.settings = board.settings; }
+        else {
+          nb.settings.vol = board.settings.vol;
+          if (voices.length && nb.settings.voice){
+            var vOk = false;
+            for (var vi = 0; vi < voices.length; vi++){ if (voices[vi].name === nb.settings.voice) vOk = true; }
+            if (!vOk) nb.settings.voice = board.settings.voice;   /* don't clobber a voice this device actually has */
+          }
+        }
         if (!nb.targets) nb.targets = board.targets || [];
         board = nb;
-        try { ensureShape(); } catch(e){}
+        try { ensureShape(); applyTheme(); } catch(e){}
         try { localStorage.setItem(LS_KEY, JSON.stringify(board)); } catch(e){}
         if (!board.pages[cur]){ cur = "home"; stack = []; }
         try { clampVol(); } catch(e){}
@@ -2498,6 +2513,7 @@ function openSettings(){
       '<option value="1"'+((board.settings.routineLevel||1)===1?" selected":"")+'>Single words</option>' +
       '<option value="2"'+(board.settings.routineLevel===2?" selected":"")+'>Short phrases</option>' +
       '<option value="3"'+(board.settings.routineLevel===3?" selected":"")+'>Sentences</option></select>' +
+    '<div class="note" style="margin-top:8px">These settings sync to every family device — tune the child\u2019s setup right from your phone. Volume level and the PIN stay per-device.</div>' +
     '<label>Voice</label><select id="vv">'+vopts+'</select>' +
     '<div class="note">Tip: on iPad, download a free “Enhanced” voice in Settings → Accessibility → Spoken Content → Voices for a much more natural child voice — it will appear in this list.</div>' +
     '<label>Voice pitch: <span id="pvv">'+board.settings.pitch.toFixed(1)+'</span> (higher = younger)</label>' +
@@ -2516,7 +2532,7 @@ function openSettings(){
       '<option value="300"'+(board.settings.hold===300?" selected":"")+'>Short hold (0.3s)</option>' +
       '<option value="600"'+(board.settings.hold===600?" selected":"")+'>Long hold (0.6s)</option></select>' +
     '<div class="note">Hold-to-select ignores quick accidental brushes — a button only speaks when pressed deliberately. Both settings are per-device, so they won’t change other devices.</div>' +
-    '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="shc"'+(dev.contrast?" checked":"")+' style="width:auto"> High-contrast mode (bold outlines, black text — easier to see)</label>' +
+    '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="shc"'+(board.settings.contrast?" checked":"")+' style="width:auto"> High-contrast mode (bold outlines, black text — easier to see)</label>' +
     '<button class="btn ghost" id="tv" style="width:100%;margin-top:10px">▶ Test voice</button>' +
     '<hr style="border:none;border-top:1px solid var(--soft);margin:16px 0">' +
     '<label>Loudest allowed: <span id="vxv">'+Math.round(board.limits.volMax*100)+'%</span></label>' +
@@ -2543,7 +2559,7 @@ function openSettings(){
   ovbox.querySelector("#sgp").addEventListener("change", function(){ board.settings.storyPrompts = this.checked; save(); });
   ovbox.querySelector("#bsz").addEventListener("change", function(){ board.settings.size = this.value; save(); render(); });
   ovbox.querySelector("#bhold").addEventListener("change", function(){ board.settings.hold = parseInt(this.value,10); save(); });
-  ovbox.querySelector("#shc").addEventListener("change", function(){ dev.contrast = this.checked; saveDev(); applyTheme(); render(); });
+  ovbox.querySelector("#shc").addEventListener("change", function(){ board.settings.contrast = this.checked; save(); applyTheme(); render(); });
   ovbox.querySelector("#tv").addEventListener("click", function(){ speak("Hi! I want to play outside."); });
   ovbox.querySelector("#svx").addEventListener("input", function(){ board.limits.volMax = parseFloat(this.value); clampVol(); ovbox.querySelector("#vxv").textContent = Math.round(board.limits.volMax*100)+"%"; save(); });
   ovbox.querySelector("#svn").addEventListener("input", function(){ board.limits.volMin = parseFloat(this.value); clampVol(); ovbox.querySelector("#vnv").textContent = Math.round(board.limits.volMin*100)+"%"; save(); });
@@ -2588,7 +2604,7 @@ document.getElementById("importIn").addEventListener("change", function(){
     try {
       var nb = JSON.parse(fr.result);
       if (!nb || !nb.pages || !nb.pages.home) throw 0;
-      board = nb; ensureShape(); save(); cur="home"; stack=[]; sent=[]; renderSent(); render(); closeOv();
+      board = nb; ensureShape(); applyTheme(); save(); cur="home"; stack=[]; sent=[]; renderSent(); render(); closeOv();
       toast("Board imported.");
     } catch(e){ toast("That file isn’t a TalkBoard backup."); }
   };
@@ -2598,9 +2614,9 @@ document.getElementById("importIn").addEventListener("change", function(){
 /* ---------- init: open durable store, restore if needed, then start ---------- */
 function startApp(){
   loadDev();
-  applyTheme();
   load();
   ensureShape();
+  applyTheme();
   renderSent();
   render();
   if (dev.fb && dev.code){
