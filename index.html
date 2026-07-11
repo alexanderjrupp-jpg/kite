@@ -47,10 +47,10 @@
   }
   body.hc #gridwrap { background:#ffffff; }
   body.hc #grid { gap:9px; }
-  body.hc .cell .pic { border:3px solid #000; box-shadow:0 3px 0 #000; }
+  body.hc .cell .pic { background:#fff !important; border:3px solid #000; box-shadow:0 3px 0 #000; }
   body.hc .cell .lab { color:#000; font-weight:700; }
   body.hc .cell .foldmark, body.hc .cell .editmark { color:#000; }
-  body.hc #sent .chip { border:2px solid #000; }
+  body.hc #sent .chip { background:#fff !important; border:2px solid #000; color:#000; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin:0; padding:0; height:100%; overflow:hidden;
     font-family:ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -471,8 +471,6 @@ var cur = "home", stack = [], sent = [], editing = false, spellBuf = "";
 /* ---------- speech ---------- */
 var SPELL_OK = { "TV":1, "OK":1, "DVD":1, "ABC":1 };   /* things that SHOULD be spelled out */
 function fixSpeech(t){
-  var lone = String(t).trim();
-  if (/^[A-Z]$/.test(lone)) return lone.toLowerCase();   /* lone capital letter: stops voices saying "capital I" */
   return String(t).split(" ").map(function(w){
     var core = w.replace(/[^A-Za-z]/g, "");
     if (core.length > 1 && core === core.toUpperCase() && !SPELL_OK[core]) return w.toLowerCase();
@@ -1581,17 +1579,14 @@ function connectFamily(mode, code, cb){
 function openSyncDlg(){
   var cu = (window.firebase && firebase.auth && firebase.auth().currentUser) || null;
   var emailUser = (cu && !cu.isAnonymous) ? (cu.email || "your account") : null;
-  var isParent = dev.role === "parent";
   var acctHtml = emailUser
-    ? '<div style="background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px">✓ Signed in as <b>'+esc(emailUser)+'</b> — this board is backed up to your account and can be restored on any device.</div>' +
+    ? '<div style="background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px">✓ Signed in as <b>'+esc(emailUser)+'</b> — your board is backed up to your account and can be restored on any device.</div>' +
       '<div class="btnrow"><button class="btn ghost" id="acSignOut">Sign out</button></div>'
-    : (isParent
-      ? '<div style="background:var(--tipbg);border:1px solid var(--tipborder);border-radius:12px;padding:10px 12px;font-size:13px">🛡️ <b>Protect this board.</b> Create a free account so that if you ever lose your family code — or your phone — signing in with your email brings everything back exactly as it was.</div>' +
-        '<div class="btnrow"><button class="btn primary" id="acCreate">Create free account</button><button class="btn ghost" id="acSignIn">Sign in</button></div>'
-      : "");
+    : '<div class="note">💾 Create a free account to back up your board and restore it on any device — even if you lose your family code.</div>' +
+      '<div class="btnrow"><button class="btn primary" id="acCreate">Create free account</button><button class="btn ghost" id="acSignIn">Sign in</button></div>';
   var connected = syncOn && dev.code;
   openOv('<h3>☁ Account &amp; sync</h3>' + acctHtml +
-    (acctHtml ? '<hr style="border:none;border-top:1px solid var(--soft);margin:14px 0">' : '') +
+    '<hr style="border:none;border-top:1px solid var(--soft);margin:14px 0">' +
     (connected
       ? '<p class="sub">Connected to family <b style="font-size:17px;letter-spacing:2px">'+esc(dev.code)+'</b> as <b>'+(dev.role==="parent"?"parent phone":"child device")+'</b>. Edits sync automatically. Enter this code on other devices to join.</p>' +
         '<div class="btnrow"><button class="btn danger" id="sydis">Disconnect this device</button></div>' +
@@ -1655,7 +1650,6 @@ function openAccountDlg(mode){
     '<p class="sub">'+(isUp?"Back up your board and restore it on any device — even if you lose your family code. Free forever.":"Sign in to restore your board on this device.")+'</p>' +
     '<label>Email</label><input type="email" id="acEmail" autocomplete="email" placeholder="you@example.com">' +
     '<label>Password</label><input type="password" id="acPass" placeholder="at least 6 characters">' +
-    '<div class="note">By continuing you agree to the <a href="privacy.html" target="_blank" style="color:var(--accent)">privacy &amp; data policy</a>. No ads, no tracking, no selling data — ever.</div>' +
     '<div class="note" id="acMsg"></div>' +
     '<div class="btnrow"><button class="btn primary" id="acGo">'+(isUp?"Create account":"Sign in")+'</button></div>' +
     '<div class="btnrow"><button class="btn ghost" id="acGoogle">Continue with Google</button></div>' +
@@ -2378,7 +2372,6 @@ function openSettings(){
     '<button class="btn ghost" id="bulk" style="width:100%">🖼️ Get real symbols for all buttons (ARASAAC)</button>' +
     '<div class="btnrow"><button class="btn ghost" id="exp">⬇ Export backup</button><button class="btn ghost" id="imp">⬆ Import</button></div>' +
     '<div class="btnrow"><button class="btn ghost" id="pinc">Change PIN</button><button class="btn ghost" id="rst">Reset board…</button></div>' +
-    '<div class="note" style="text-align:center;margin-top:10px"><a href="privacy.html" target="_blank" style="color:var(--muted)">Privacy &amp; data policy</a></div>' +
     '<div class="btnrow"><button class="btn primary" id="sd">Done</button></div>');
   ovbox.querySelector("#rep").addEventListener("click", openReport);
   ovbox.querySelector("#syncb").addEventListener("click", openSyncDlg);
