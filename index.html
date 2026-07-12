@@ -230,6 +230,8 @@
 <script>
 window.onerror = function(msg, src, line){
   try {
+    /* ignore opaque cross-origin errors (Firebase/Google/ARASAAC) — they don't break the app */
+    if (!msg || /script error/i.test(msg) || (!line && (!src || src.indexOf(location.origin) !== 0))) return;
     var d = document.createElement("div");
     d.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:999;background:#c0392b;color:#fff;font:13px sans-serif;padding:8px 12px;text-align:center";
     d.textContent = "Kite hit an error — tell Claude: " + msg + " (line " + line + ")";
