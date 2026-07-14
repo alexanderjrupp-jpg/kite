@@ -51,6 +51,22 @@
   body.hc .cell .lab { color:#000; font-weight:700; }
   body.hc .cell .foldmark, body.hc .cell .editmark { color:#000; }
   body.hc #sent .chip { background:#fff !important; border:2px solid #000; color:#000; }
+  /* ===== CVI mode: black field, high luminance contrast, minimal color (for cortical visual impairment) ===== */
+  body.cvi {
+    --bg:#000000; --bgfx:none; --panel:#000000; --border:#ffffff; --soft:#161616;
+    --text:#ffffff; --muted:#cfcfcf; --accent:#ffe000; --accent2:#ffe000; --accent3:#ffe000;
+    --accsoft:#333300; --sentbg:#000000; --sentborder:#ffffff; --tipbg:#111111; --tipborder:#ffffff;
+    --good:#00e000; --bad:#ff6060; --chip:#000000; --empty:#000000; --emptyedit:#888888;
+    --shadow:none; --surface:#000000; --surfborder:#333333; --glass:#000000; --ambient:none; --kitetail:#ffffff;
+  }
+  body.cvi #gridwrap { background:#000; }
+  body.cvi #grid { gap:12px; }
+  body.cvi .cell .pic { background:#000 !important; border:3px solid #fff; box-shadow:none; border-radius:12px; }
+  body.cvi .cell .lab { color:#fff; font-weight:700; }
+  body.cvi .cell .foldmark, body.cvi .cell .editmark { color:#fff; }
+  body.cvi #sent { background:#000; }
+  body.cvi #sent .chip { background:#000 !important; border:2px solid #fff; color:#fff; }
+  body.cvi #navbar, body.cvi #botbar, body.cvi #topbar { background:#000; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin:0; padding:0; height:100%; overflow:hidden;
     font-family:ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -230,8 +246,6 @@
 <script>
 window.onerror = function(msg, src, line){
   try {
-    /* ignore opaque cross-origin errors (Firebase/Google/ARASAAC) — they don't break the app */
-    if (!msg || /script error/i.test(msg) || (!line && (!src || src.indexOf(location.origin) !== 0))) return;
     var d = document.createElement("div");
     d.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:999;background:#c0392b;color:#fff;font:13px sans-serif;padding:8px 12px;text-align:center";
     d.textContent = "Kite hit an error — tell Claude: " + msg + " (line " + line + ")";
@@ -240,6 +254,24 @@ window.onerror = function(msg, src, line){
 };
 (function(){
 "use strict";
+/* ============================================================
+   KITE — single-file AAC app.  Section map (search these tags):
+     [CONFIG]     Firebase config, device identity
+     [BOARDS]     starter board data, page builders
+     [STATE]      board state, storage (localStorage + IndexedDB)
+     [SPEECH]     TTS, recorded-audio playback
+     [GRAMMAR]    suffix + irregular handling
+     [RENDER]     board render, sentence bar
+     [KEYBOARD]   spell keyboard modes
+     [EDIT]       button editor, drag-and-drop
+     [SYMBOLS]    ARASAAC search + bulk
+     [PAGES]      page builder
+     [PRACTICE]   word finder, routines, stories, game
+     [REPORTS]    weekly / detailed / remote + shared UI
+     [SETTINGS]   settings dialog
+     [SYNC]       Firebase board sync, accounts
+     [INIT]       boot + service worker
+   ============================================================ */
 var LS_KEY = "talkboard_v3";
 var ROWS = 7, COLS = 12;
 
@@ -395,7 +427,6 @@ function markMilestone(key, msg, say){
   if (board.milestones[key]) return false;
   board.milestones[key] = Date.now(); save();
   toast("🎉 " + msg);
-  if (say) setTimeout(function(){ speak(say); }, 450);
   return true;
 }
 function checkWordMilestones(){
@@ -475,6 +506,7 @@ function ensureShape(){
   if (board.settings.volMax === undefined) board.settings.volMax = 1;
   if (board.settings.volMin === undefined) board.settings.volMin = 0.15;
   if (!board.settings.kbLayout) board.settings.kbLayout = "qwerty";
+  if (board.settings.motorReturn === undefined) board.settings.motorReturn = false;
   if (!board.settings.routineLevel) board.settings.routineLevel = 1;
   if (!board.fspFix){
     Object.keys(board.pages).forEach(function(pk){
@@ -498,6 +530,7 @@ function fixSpeech(t){
 var voices = [];
 function loadVoices(){ voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; }
 if (window.speechSynthesis){ loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+/* ===== [SPEECH] ===== */
 function speak(text){
   if (!text || !window.speechSynthesis) return;
   try {
@@ -559,6 +592,7 @@ var IRR = {
   est:{ good:"best", bad:"worst", far:"farthest", many:"most", little:"least" },
   ing:{ be:"being", see:"seeing", open:"opening", listen:"listening", happen:"happening", visit:"visiting", travel:"traveling", run:"running", swim:"swimming", sit:"sitting", get:"getting", put:"putting", cut:"cutting", stop:"stopping" }
 };
+/* ===== [GRAMMAR] ===== */
 function applySuffix(word, sfx){
   var w = word;
   var lw = w.toLowerCase();
@@ -582,6 +616,7 @@ function picHTML(b, big){
   if (b.img && b.img.u) return '<img src="'+b.img.u+'" alt="">';
   return '<span class="em">'+ (b.e||"") +'</span>';
 }
+/* ===== [RENDER] ===== */
 function render(){
   var p = board.pages[cur];
   if (!p){ cur = "home"; p = board.pages.home; }
@@ -718,6 +753,8 @@ function tapButton(idx, b){
   }
   pushWord(b);
   guideCheck(cur, idx);
+  /* motor-plan: after choosing a word, return to the core/home page (LAMP / TD Snap style) */
+  if (board.settings.motorReturn && !guide && cur !== "home"){ cur = "home"; stack = []; render(); }
 }
 function pushWord(b){
   var it = { l:b.l, say:(b.s || b.l), e:b.e, img:b.img, au:(b.au || null), c:(b.c || "w") };
@@ -773,6 +810,7 @@ var spellMode = "abc";
 var PHON = { a:"ah", b:"buh", c:"kuh", d:"duh", e:"eh", f:"fuh", g:"gah", h:"huh", i:"ih", j:"juh", k:"kuh", l:"luh", m:"muh", n:"nuh", o:"aw", p:"puh", q:"kwuh", r:"ruh", s:"suh", t:"tuh", u:"uh", v:"vuh", w:"wuh", x:"kuhs", y:"yuh", z:"zuh" };
 var LONGV = [["ā","ay"],["ē","ee"],["ī","eye"],["ō","oh"],["ū","you"]];
 var PUNCT = [[".","period"],["?","question mark"],["!","exclamation mark"],[",","comma"],["'","apostrophe"],[":","colon"],[";","semicolon"]];
+/* ===== [KEYBOARD] ===== */
 function openSpell(){
   spellBuf = "";
   spellMode = "abc";
@@ -890,7 +928,15 @@ editBtn.addEventListener("click", function(){
   function unlock(){
     endGuide();
     editing = true; editBtn.className="on"; editBtn.innerHTML = "✓ Done"; render();
-    toast("💡 " + todayTip());
+    if (!board.settings.symbolsNudged && navigator.onLine){
+      board.settings.symbolsNudged = true; save();
+      openOv('<h3>🖼️ Use real AAC symbols?</h3><p class="sub">Therapists recommend real communication symbols over emoji. Kite can fetch a matching ARASAAC symbol for every button — one time, needs internet, then works offline.</p>' +
+        '<div class="btnrow"><button class="btn" id="nsl">Later</button><button class="btn primary" id="nsy">Get symbols</button></div>');
+      ovbox.querySelector("#nsl").addEventListener("click", closeOv);
+      ovbox.querySelector("#nsy").addEventListener("click", function(){ closeOv(); bulkSymbols(); });
+    } else {
+      toast("💡 " + todayTip());
+    }
   }
   if (dev.role === "parent") unlock();      /* parent’s own phone — no PIN needed */
   else askPin(unlock);
@@ -919,6 +965,7 @@ function askPin(onOk){
 }
 
 /* ---------- ARASAAC ---------- */
+/* ===== [SYMBOLS] ===== */
 function arasaacSearch(q, cb){
   var url = "https://api.arasaac.org/api/pictograms/en/search/" + encodeURIComponent(q);
   fetch(url).then(function(r){ return r.ok ? r.json() : []; }).then(function(list){
@@ -969,6 +1016,7 @@ document.getElementById("photoIn").addEventListener("change", function(){
   fr.readAsDataURL(f);
 });
 
+/* ===== [EDIT] ===== */
 function openEditor(idx, b){
   var isNew = !b;
   var d = b ? JSON.parse(JSON.stringify(b)) : W("", "⬜");
@@ -1198,6 +1246,7 @@ function makeSpillPage(fromKey){
   board.pages[pid] = stubPage(base + " 2");
   return pid;
 }
+/* ===== [PAGES] ===== */
 function openBuilder(){
   var chips = Object.keys(TOPICS).map(function(k){
     return '<button class="btn ghost tchip" data-t="'+esc(k)+'" style="flex:0 0 auto;padding:8px 12px;font-size:13px">'+esc(k)+'</button>';
@@ -1305,7 +1354,8 @@ function saveDev(){
 }
 function applyTheme(){
   document.body.classList.toggle("dark", dev.theme === "dark");
-  document.body.classList.toggle("hc", !!dev.contrast);
+  document.body.classList.toggle("cvi", !!dev.cvi);
+  document.body.classList.toggle("hc", !!dev.contrast && !dev.cvi);
   var tb = document.getElementById("themeBtn");
   if (tb) tb.textContent = dev.theme === "dark" ? "☀️" : "🌙";
 }
@@ -1331,6 +1381,7 @@ function loadScript(src, cb){
   document.head.appendChild(s);
 }
 var fbCbs = null;
+/* ===== [SYNC] ===== */
 function initFirebase(cb){
   if (db){ cb(null); return; }
   if (!dev.fb){ cb("No Firebase config saved yet."); return; }
@@ -1368,7 +1419,6 @@ function friendlyAuth(e){
   if (c === "auth/operation-not-allowed") return "That sign-in method isn’t enabled in Firebase yet.";
   return (e && e.message) || "Something went wrong.";
 }
-function isEmailUser(){ return !!(window.firebase && firebase.auth && firebase.auth().currentUser && !firebase.auth().currentUser.isAnonymous); }
 function saveUserProfile(){
   try {
     var u = firebase.auth().currentUser;
@@ -1432,12 +1482,6 @@ function signOutAcct(cb){
   catch(e){ if(cb)cb(); }
 }
 
-function parseFbConfig(txt){
-  var m = String(txt).match(/\{[\s\S]*\}/);
-  if (!m) return null;
-  var s = m[0].replace(/([,{]\s*)([A-Za-z_]\w*)\s*:/g, '$1"$2":').replace(/'/g, '"').replace(/,\s*\}/g, "}");
-  try { var o = JSON.parse(s); return (o.apiKey && o.projectId) ? o : null; } catch(e){ return null; }
-}
 /* board doc stays under Firestore's 1MB limit: images/recordings are split into media docs */
 function stripMedia(){
   var media = {};
@@ -1692,6 +1736,39 @@ function openAccountDlg(mode){
 }
 
 /* remote report: parent phone reads what the child device uploaded */
+/* ===== SHARED REPORT UI (used by weekly / detailed / remote reports) ===== */
+function rptStat(n, label){
+  return '<div style="flex:1;background:var(--soft);border-radius:12px;padding:9px;text-align:center"><div style="font-size:21px;font-weight:800;color:var(--accent)">'+n+'</div><div style="font-size:11px;color:var(--muted)">'+label+'</div></div>';
+}
+function rptTopWords(counts, limit, emptyMsg){
+  var top = Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; }).slice(0, limit);
+  if (!top.length) return '<div class="note">'+emptyMsg+'</div>';
+  var maxN = counts[top[0]] || 1;
+  return top.map(function(w){
+    return '<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><div style="width:90px;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(w)+'</div>' +
+      '<div style="flex:1;height:13px;background:var(--soft);border-radius:99px"><div style="height:13px;border-radius:99px;background:var(--accent);width:'+Math.max(5, Math.round(counts[w]/maxN*100))+'%"></div></div>' +
+      '<div style="width:34px;text-align:right;font-size:13px">'+counts[w]+'</div></div>';
+  }).join("");
+}
+function rptDayBars(items){
+  var maxD = 1;
+  items.forEach(function(it){ if (it.n > maxD) maxD = it.n; });
+  return items.map(function(dc){
+    return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:70%;background:var(--accent);border-radius:4px 4px 0 0;height:'+Math.round(dc.n/maxD*54)+'px"></div><div style="font-size:11px;color:var(--muted)">'+dc.lb+'</div></div>';
+  }).join("");
+}
+function rptTargets(cThis, cLast, keyFn){
+  keyFn = keyFn || function(w){ return w.toLowerCase(); };
+  return board.targets.map(function(tw, i){
+    var a = cThis[keyFn(tw)]||0, b = cLast[keyFn(tw)]||0;
+    var trend = a > b ? "↑" : (a < b ? "↓" : "→");
+    var col = a > b ? "var(--good)" : (a < b ? "var(--bad)" : "var(--muted)");
+    return '<div style="display:flex;align-items:center;gap:8px;margin:5px 0;padding:8px 10px;background:var(--soft);border-radius:10px">' +
+      '<div style="flex:1;font-weight:600">'+esc(tw)+'</div><div style="font-size:13px">'+a+' this wk · '+b+' last wk</div>' +
+      '<div style="font-weight:700;color:'+col+'">'+trend+'</div><button class="btn ghost tdel" data-i="'+i+'" style="flex:0 0 auto;padding:4px 10px">✕</button></div>';
+  }).join("") || '<div class="note">No target words yet — add words you and his SLP are working on.</div>';
+}
+
 function remoteReport(){
   openOv('<h3>📊 Weekly report</h3><p class="sub">Loading from your family…</p>');
   var cutoff = dkey(new Date(Date.now() - 14*864e5));
@@ -1707,32 +1784,14 @@ function remoteReport(){
         else { cL[w] = (cL[w]||0)+n; totL += n; }
       });
     });
-    var top = Object.keys(cT).sort(function(a,b){ return cT[b]-cT[a]; }).slice(0,10);
-    var maxN = top.length ? cT[top[0]] : 1;
-    var topHtml = top.length ? top.map(function(w){
-      return '<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><div style="width:90px;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(w)+'</div>' +
-        '<div style="flex:1;height:14px;background:var(--soft);border-radius:99px"><div style="height:14px;border-radius:99px;background:var(--accent);width:'+Math.max(6, Math.round(cT[w]/maxN*100))+'%"></div></div>' +
-        '<div style="width:34px;text-align:right;font-size:13px">'+cT[w]+'</div></div>';
-    }).join("") : '<div class="note">Nothing recorded yet this week — counts appear after words are tapped on the connected device.</div>';
-    var days = "", maxD = 1, list = [];
+    var topHtml = rptTopWords(cT, 10, "Nothing recorded yet this week — counts appear after words are tapped on the connected device.");
+    var list = [];
     for (var i=6; i>=0; i--){
       var d0 = new Date(Date.now() - i*864e5);
-      var n = dayTot[dkey(d0)] || 0;
-      list.push({ lb: "SMTWTFS"[d0.getDay()], n: n });
-      if (n > maxD) maxD = n;
+      list.push({ lb: "SMTWTFS"[d0.getDay()], n: dayTot[dkey(d0)] || 0 });
     }
-    list.forEach(function(dc){
-      days += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:70%;background:var(--accent);border-radius:4px 4px 0 0;height:'+Math.round(dc.n/maxD*54)+'px"></div><div style="font-size:11px;color:var(--muted)">'+dc.lb+'</div></div>';
-    });
-    var tHtml = board.targets.map(function(tw, i2){
-      var k = safeKey(tw.toLowerCase());
-      var a = cT[k]||0, b = cL[k]||0;
-      var trend = a > b ? "↑" : (a < b ? "↓" : "→");
-      var col = a > b ? "var(--good)" : (a < b ? "var(--bad)" : "var(--muted)");
-      return '<div style="display:flex;align-items:center;gap:8px;margin:5px 0;padding:8px 10px;background:var(--soft);border-radius:10px">' +
-        '<div style="flex:1;font-weight:600">'+esc(tw)+'</div><div style="font-size:13px">'+a+' this wk · '+b+' last wk</div>' +
-        '<div style="font-weight:700;color:'+col+'">'+trend+'</div><button class="btn ghost tdel" data-i="'+i2+'" style="flex:0 0 auto;padding:4px 10px">✕</button></div>';
-    }).join("") || '<div class="note">No target words yet — add words you and his SLP are working on.</div>';
+    var days = rptDayBars(list);
+    var tHtml = rptTargets(cT, cL, function(tw){ return safeKey(tw.toLowerCase()); });
     openOv('<h3>📊 Weekly report <span style="font-size:12px;color:var(--muted)">(from his device)</span></h3>' +
       '<p class="sub">'+totT+' words spoken this week'+(totL ? ' ('+totL+' last week)' : '')+'</p>' +
       '<label>Words per day</label><div style="display:flex;align-items:flex-end;gap:4px;height:74px">'+days+'</div>' +
@@ -1780,12 +1839,8 @@ function deepReport(){
   var hBars = hrs.map(function(n, i){
     return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:70%;background:var(--accent);border-radius:3px 3px 0 0;height:'+Math.round(n/maxH*44)+'px"></div><div style="font-size:9px;color:var(--muted)">'+(i*2)+'</div></div>';
   }).join("");
-  var top = Object.keys(cAll).sort(function(a,b){ return cAll[b]-cAll[a]; }).slice(0,20);
-  var maxT = top.length ? cAll[top[0]] : 1;
-  var topHtml = top.map(function(w){
-    return '<div style="display:flex;align-items:center;gap:8px;margin:2px 0"><div style="width:90px;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(w)+'</div><div style="flex:1;height:11px;background:var(--soft);border-radius:99px"><div style="height:11px;border-radius:99px;background:var(--accent);width:'+Math.max(4, Math.round(cAll[w]/maxT*100))+'%"></div></div><div style="width:34px;text-align:right;font-size:12px">'+cAll[w]+'</div></div>';
-  }).join("") || '<div class="note">No taps recorded on this device yet.</div>';
-  function stat(n, l){ return '<div style="flex:1;background:var(--soft);border-radius:12px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--accent)">'+n+'</div><div style="font-size:11px;color:var(--muted)">'+l+'</div></div>'; }
+  var topHtml = rptTopWords(cAll, 20, "No taps recorded on this device yet.");
+  var stat = rptStat;
   openOv('<h3>🔎 Detailed report</h3><p class="sub">Everything this device recorded (last 60 days). Made for parents, teachers, and SLPs.</p>' +
     '<div style="display:flex;gap:8px">'+stat(total,"total taps")+stat(uniqAll,"different words")+stat(avg,"taps / active day")+'</div>' +
     '<div style="display:flex;gap:8px;margin-top:8px">'+stat(uniqW,"words this week")+stat(newW.length,"new this week")+stat(dayN,"active days")+'</div>' +
@@ -1827,34 +1882,16 @@ function openReport(){
   var adays = {}; thisW.forEach(function(e){ adays[dkey(new Date(e.t))]=1; });
   var activeDays = Object.keys(adays).length;
   var growthPct = lastW.length ? Math.round((thisW.length-lastW.length)/lastW.length*100) : null;
-  function gstat(n,l){ return '<div style="flex:1;background:var(--soft);border-radius:12px;padding:8px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--accent)">'+n+'</div><div style="font-size:11px;color:var(--muted)">'+l+'</div></div>'; }
-  var top = Object.keys(cT).sort(function(a,b){ return cT[b]-cT[a]; }).slice(0,10);
-  var maxN = top.length ? cT[top[0]] : 1;
-  var topHtml = top.length ? top.map(function(w){
-    return '<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><div style="width:90px;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(w)+'</div>' +
-      '<div style="flex:1;height:14px;background:var(--soft);border-radius:99px"><div style="height:14px;border-radius:99px;background:var(--accent);width:'+Math.max(6, Math.round(cT[w]/maxN*100))+'%"></div></div>' +
-      '<div style="width:34px;text-align:right;font-size:13px">'+cT[w]+'</div></div>';
-  }).join("") : '<div class="note">No taps recorded yet this week.</div>';
-  /* per-day mini chart */
-  var days = "", maxD = 1, dcounts = [];
+  var gstat = rptStat;
+  var topHtml = rptTopWords(cT, 10, "No taps recorded yet this week.");
+  var dlist = [];
   for (var i=6; i>=0; i--){
     var d0 = new Date(); d0.setHours(0,0,0,0); d0 = d0.getTime() - i*864e5;
     var n = log.filter(function(e){ return e.t >= d0 && e.t < d0+864e5; }).length;
-    dcounts.push({ t:d0, n:n }); if (n > maxD) maxD = n;
+    dlist.push({ lb: "SMTWTFS"[new Date(d0).getDay()], n: n });
   }
-  dcounts.forEach(function(dc){
-    var lb = "SMTWTFS"[new Date(dc.t).getDay()];
-    days += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:70%;background:var(--accent);border-radius:4px 4px 0 0;height:'+Math.round(dc.n/maxD*54)+'px"></div><div style="font-size:11px;color:var(--muted)">'+lb+'</div></div>';
-  });
-  /* targets */
-  var tHtml = board.targets.map(function(tw, i){
-    var a = cT[tw.toLowerCase()]||0, b = cL[tw.toLowerCase()]||0;
-    var trend = a > b ? "↑" : (a < b ? "↓" : "→");
-    var col = a > b ? "var(--good)" : (a < b ? "var(--bad)" : "var(--muted)");
-    return '<div style="display:flex;align-items:center;gap:8px;margin:5px 0;padding:8px 10px;background:var(--soft);border-radius:10px">' +
-      '<div style="flex:1;font-weight:600">'+esc(tw)+'</div><div style="font-size:13px">'+a+' this wk · '+b+' last wk</div>' +
-      '<div style="font-weight:700;color:'+col+'">'+trend+'</div><button class="btn ghost tdel" data-i="'+i+'" style="flex:0 0 auto;padding:4px 10px">✕</button></div>';
-  }).join("") || '<div class="note">No target words yet — add words you and his SLP are working on.</div>';
+  var days = rptDayBars(dlist);
+  var tHtml = rptTargets(cT, cL);
   openOv('<h3>📊 Weekly report</h3>' +
     '<div class="btnrow" style="margin-top:0"><button class="btn ghost" id="deepb">🔎 Detailed report &amp; CSV export</button></div>' +
     '<p class="sub">'+thisW.length+' words spoken this week'+(lastW.length?' (' + lastW.length + ' last week)':'')+'</p>' +
@@ -2097,6 +2134,7 @@ function guideCheck(pageAtTap, idx){
 
 /* ---------- word finder ---------- */
 document.getElementById("wfBtn").addEventListener("click", openWordFinder);
+/* ===== [PRACTICE] ===== */
 function openWordFinder(){
   var ix = wordIndex();
   var all = Object.keys(ix).sort();
@@ -2347,6 +2385,7 @@ function startRoutine(r){
 document.getElementById("setBtn").addEventListener("click", function(){
   askPin(openSettings);
 });
+/* ===== [SETTINGS] ===== */
 function openSettings(){
   var vopts = '<option value="">System default</option>';
   var en = voices.filter(function(v){ return /^en/i.test(v.lang); });
@@ -2380,6 +2419,8 @@ function openSettings(){
       '<option value="600"'+(board.settings.hold===600?" selected":"")+'>Long hold (0.6s)</option></select>' +
     '<div class="note">Hold-to-select ignores quick accidental brushes — a button only speaks when pressed deliberately. Both settings are per-device, so they won’t change other devices.</div>' +
     '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="shc"'+(dev.contrast?" checked":"")+' style="width:auto"> High-contrast mode (bold outlines, black text — easier to see)</label>' +
+    '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="scvi"'+(dev.cvi?" checked":"")+' style="width:auto"> CVI mode (black background, high-contrast — for visual impairment)</label>' +
+    '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="smr"'+(board.settings.motorReturn?" checked":"")+' style="width:auto"> Return to home after each word (motor planning — like LAMP)</label>' +
     '<button class="btn ghost" id="tv" style="width:100%;margin-top:10px">▶ Test voice</button>' +
     '<hr style="border:none;border-top:1px solid var(--soft);margin:16px 0">' +
     '<label>Loudest allowed: <span id="vxv">'+Math.round(board.settings.volMax*100)+'%</span></label>' +
@@ -2405,6 +2446,8 @@ function openSettings(){
   ovbox.querySelector("#bsz").addEventListener("change", function(){ board.settings.size = this.value; save(); render(); });
   ovbox.querySelector("#bhold").addEventListener("change", function(){ board.settings.hold = parseInt(this.value,10); save(); });
   ovbox.querySelector("#shc").addEventListener("change", function(){ dev.contrast = this.checked; saveDev(); applyTheme(); render(); });
+  ovbox.querySelector("#scvi").addEventListener("change", function(){ dev.cvi = this.checked; saveDev(); applyTheme(); render(); });
+  ovbox.querySelector("#smr").addEventListener("change", function(){ board.settings.motorReturn = this.checked; save(); });
   ovbox.querySelector("#tv").addEventListener("click", function(){ speak("Hi! I want to play outside."); });
   ovbox.querySelector("#svx").addEventListener("input", function(){ board.settings.volMax = parseFloat(this.value); clampVol(); ovbox.querySelector("#vxv").textContent = Math.round(board.settings.volMax*100)+"%"; save(); });
   ovbox.querySelector("#svn").addEventListener("input", function(){ board.settings.volMin = parseFloat(this.value); clampVol(); ovbox.querySelector("#vnv").textContent = Math.round(board.settings.volMin*100)+"%"; save(); });
