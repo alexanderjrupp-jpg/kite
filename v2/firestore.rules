@@ -1,0 +1,62 @@
+rules_version = '2';
+// Kite security rules — paste into Firebase console → Firestore Database → Rules → Publish.
+//
+// v2 model: only devices that are members of a family can read or write it.
+// A device becomes a member by creating the family, or by joining with a
+// 15-minute pairing code (the QR code). Nobody can list families or pairing codes.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function famPath(fid) { return /databases/$(database)/documents/k2_families/$(fid); }
+    function isMember(fid) {
+      return signedIn() && exists(/databases/$(database)/documents/k2_families/$(fid)/members/$(request.auth.uid));
+    }
+    function isOwner(fid) {
+      return signedIn() && get(famPath(fid)).data.owner == request.auth.uid;
+    }
+    function validPair(code, fid) {
+      return code is string
+        && exists(/databases/$(database)/documents/k2_pairs/$(code))
+        && get(/databases/$(database)/documents/k2_pairs/$(code)).data.fid == fid
+        && get(/databases/$(database)/documents/k2_pairs/$(code)).data.exp > request.time;
+    }
+
+    match /k2_families/{fid} {
+      allow create: if signedIn() && request.resource.data.owner == request.auth.uid;
+      allow get:    if isMember(fid) || isOwner(fid);
+      allow update: if isOwner(fid) && request.resource.data.owner == resource.data.owner;
+      allow delete: if isOwner(fid);
+      // no "list": nobody can browse other families
+
+      match /members/{uid} {
+        allow get, list: if isMember(fid);
+        // the owner adds themself; anyone else needs a live pairing code for this family
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && (isOwner(fid) || validPair(request.resource.data.code, fid));
+        // leave the family yourself, or the owner removes a device
+        allow delete: if signedIn() && (request.auth.uid == uid || isOwner(fid));
+      }
+
+      // the board itself: pages, one document per button, photos and recordings
+      match /pages/{pk}  { allow read, write: if isMember(fid); }
+      match /cells/{key} { allow read, write: if isMember(fid); }
+      match /media/{id}  { allow read, write: if isMember(fid); }
+    }
+
+    match /k2_pairs/{code} {
+      allow get:    if signedIn();   // you must already know the code; no listing
+      allow create: if signedIn() && isMember(request.resource.data.fid)
+                    && request.resource.data.exp < request.time + duration.value(30, 'm');
+      allow delete: if signedIn() && isMember(resource.data.fid);
+    }
+
+    match /k2_users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // v1 data (no longer used) — closed
+    match /families/{document=**} { allow read, write: if false; }
+    match /users/{uid} { allow read, write: if false; }
+  }
+}

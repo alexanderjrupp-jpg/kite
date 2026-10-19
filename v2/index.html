@@ -891,7 +891,7 @@ editBtn.addEventListener("click", function(){
       ovbox.querySelector("#nsy").addEventListener("click", function(){ closeOv(); bulkSymbols(); });
     }
   }
-  if (dev.role === "parent") unlock();      /* parent’s own phone — no PIN needed */
+  if (dev.fid && dev.role && dev.role !== "child") unlock();   /* a connected parent/therapist device — no PIN needed */
   else askPin(unlock);
 });
 function askPin(onOk){
@@ -1268,6 +1268,7 @@ function loadDev(){
   if (!dev) dev = { id: "d"+Date.now().toString(36)+Math.random().toString(36).slice(2,7), role: "child", fb: null, code: null };
   if (!dev.fb) dev.fb = DEFAULT_FB;
   if (!dev.theme) dev.theme = "light";
+  if (dev.code){ delete dev.code; }
   saveDev();
 }
 function saveDev(){
@@ -1290,10 +1291,27 @@ function dkey(d){ return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-
 function safeKey(w){ return String(w).replace(/[.#$/\[\]]/g,"_").slice(0,40); }
 function genId(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-/* ---------- firebase sync ---------- */
-var db = null, syncOn = false, unsubBoard = null, pushTimer = null, applyingRemote = false;
-var pushedIds = {};
-try { pushedIds = JSON.parse(localStorage.getItem("kite2_pushed")) || {}; } catch(e){}
+/* ---------- family sync (v2) ----------
+   Firestore layout:
+     k2_families/{fid}                  { owner, created }
+     k2_families/{fid}/members/{uid}    { role, device, joined, code? }   only members can read/write the family
+     k2_families/{fid}/pages/{pk}       { pk, p (JSON: name/cols/rows), src, t }
+     k2_families/{fid}/cells/{pk~idx}   { pk, i, b (JSON button), src, t }  one document per button
+     k2_families/{fid}/media/{id}       { d }   family photos + recorded voices
+     k2_pairs/{code}                    { fid, by, exp }   15-minute pairing code shown as a QR
+     k2_users/{uid}                     { fid, role, email }   account recovery
+   Because each button is its own document, two people editing different buttons never
+   overwrite each other. Edits made offline win when the device reconnects. */
+var db = null, syncOn = false, unsubs = [], pushTimer = null, pushing = false, pushAgain = false;
+var SHADOW_KEY = "kite2_shadow", MEDIA_KEY = "kite2_pushed";
+var shadow = {};      /* last state known to match the cloud: key -> canonical JSON */
+var pushedIds = {};   /* media ids already uploaded */
+try { shadow = JSON.parse(localStorage.getItem(SHADOW_KEY)) || {}; } catch(e){ shadow = {}; }
+try { pushedIds = JSON.parse(localStorage.getItem(MEDIA_KEY)) || {}; } catch(e){ pushedIds = {}; }
+function saveShadow(){
+  try { localStorage.setItem(SHADOW_KEY, JSON.stringify(shadow)); } catch(e){}
+  try { localStorage.setItem(MEDIA_KEY, JSON.stringify(pushedIds)); } catch(e){}
+}
 function setStatus(msg){
   var el = document.getElementById("syncst");
   if (el) el.textContent = msg;
@@ -1307,17 +1325,17 @@ var fbCbs = null;
 /* ===== [SYNC] ===== */
 function initFirebase(cb){
   if (db){ cb(null); return; }
-  if (!dev.fb){ cb("No Firebase config saved yet."); return; }
+  if (!dev.fb) dev.fb = DEFAULT_FB;
   if (fbCbs){ fbCbs.push(cb); return; }
   fbCbs = [cb];
   function done(err){ var q = fbCbs; fbCbs = null; q.forEach(function(f){ f(err); }); }
   var base = "https://www.gstatic.com/firebasejs/10.14.1/";
   loadScript(base+"firebase-app-compat.js", function(e1){
-    if (e1){ done("Couldn’t load Firebase — check internet."); return; }
+    if (e1){ done("Couldn’t load sync — check internet."); return; }
     loadScript(base+"firebase-auth-compat.js", function(e2){
-      if (e2){ done("Couldn’t load Firebase auth."); return; }
+      if (e2){ done("Couldn’t load sync (auth)."); return; }
       loadScript(base+"firebase-firestore-compat.js", function(e3){
-        if (e3){ done("Couldn’t load Firestore."); return; }
+        if (e3){ done("Couldn’t load sync (database)."); return; }
         try {
           if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(dev.fb);
           var au = firebase.auth(), settled = false;
@@ -1331,6 +1349,296 @@ function initFirebase(cb){
     });
   });
 }
+function myUid(){ try { var u = firebase.auth().currentUser; return u ? u.uid : null; } catch(e){ return null; } }
+function fam(fid){ return db.collection("k2_families").doc(fid || dev.fid); }
+function isPermErr(e){ return e && (e.code === "permission-denied" || /permission/i.test(e.message || "")); }
+
+/* stable JSON (sorted keys) so the same button always serializes to the same string */
+function canon(v){
+  if (v === null || typeof v !== "object") return JSON.stringify(v === undefined ? null : v);
+  if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
+  return "{" + Object.keys(v).sort().filter(function(k){ return v[k] !== undefined; })
+    .map(function(k){ return JSON.stringify(k) + ":" + canon(v[k]); }).join(",") + "}";
+}
+function cellKey(pk, idx){ return pk + "~" + idx; }
+function splitKey(k){ var j = k.lastIndexOf("~"); return [k.slice(0, j), parseInt(k.slice(j+1), 10)]; }
+/* a button as it lives in the cloud: symbol URLs inline, photos/recordings by reference */
+function cellOut(b, media){
+  var c = JSON.parse(JSON.stringify(b));
+  if (b.img && b.img.u) c.img = { u: b.img.u };
+  else if (b.img && b.img.d){
+    if (!b.img.id) b.img.id = genId("m");
+    media[b.img.id] = b.img.d; c.img = { id: b.img.id };
+  } else if (b.img && b.img.id) c.img = { id: b.img.id };
+  else c.img = null;
+  delete c.auId; delete c.auRef;
+  if (b.au){
+    if (!b.auId) b.auId = genId("a");
+    media[b.auId] = b.au; c.au = null; c.auRef = b.auId;
+  }
+  return canon(c);
+}
+function pageOut(p){ return canon({ name: p.name, cols: p.cols || null, rows: p.rows || null }); }
+function currentMap(media){
+  var m = {};
+  Object.keys(board.pages).forEach(function(pk){
+    var p = board.pages[pk];
+    m["P~" + pk] = pageOut(p);
+    Object.keys(p.cells).forEach(function(ci){ if (p.cells[ci]) m[cellKey(pk, ci)] = cellOut(p.cells[ci], media); });
+  });
+  return m;
+}
+
+/* ----- push: send only what changed since the cloud last matched ----- */
+function schedulePush(){
+  if (!syncOn) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushChanges, 1200);
+}
+function pushChanges(){
+  if (!syncOn || !db || !dev.fid) return;
+  if (pushing){ pushAgain = true; return; }
+  var media = {}, now = currentMap(media), ops = [];
+  Object.keys(now).forEach(function(k){ if (shadow[k] !== now[k]) ops.push([k, now[k]]); });
+  Object.keys(shadow).forEach(function(k){ if (!(k in now)) ops.push([k, null]); });
+  try { localStorage.setItem(LS_KEY, JSON.stringify(board)); } catch(e){}   /* keeps new media ids */
+  if (!ops.length){ setStatus("Synced ✓"); return; }
+  pushing = true; setStatus("Syncing…");
+  function finish(ok){
+    pushing = false;
+    saveShadow();
+    if (!ok){ setStatus("Sync paused — will retry"); setTimeout(schedulePush, 15000); return; }
+    setStatus("Synced ✓");
+    if (pushAgain){ pushAgain = false; pushChanges(); }
+  }
+  var mids = Object.keys(media).filter(function(id){ return !pushedIds[id]; });
+  var mi = 0;
+  (function nextMedia(){
+    if (mi < mids.length){
+      var id = mids[mi++];
+      fam().collection("media").doc(id).set({ d: media[id] })
+        .then(function(){ pushedIds[id] = 1; nextMedia(); })
+        .catch(function(){ finish(false); });
+      return;
+    }
+    var chunks = [];
+    for (var i = 0; i < ops.length; i += 400) chunks.push(ops.slice(i, i + 400));
+    var ci = 0;
+    (function nextChunk(){
+      if (ci >= chunks.length){ finish(true); return; }
+      var ch = chunks[ci++], batch = db.batch(), t = Date.now();
+      ch.forEach(function(op){
+        var k = op[0], v = op[1];
+        if (k.indexOf("P~") === 0){
+          var pref = fam().collection("pages").doc(k.slice(2));
+          if (v === null) batch.delete(pref); else batch.set(pref, { pk: k.slice(2), p: v, src: dev.id, t: t });
+        } else {
+          var sk = splitKey(k), cref = fam().collection("cells").doc(k);
+          if (v === null) batch.delete(cref); else batch.set(cref, { pk: sk[0], i: sk[1], b: v, src: dev.id, t: t });
+        }
+      });
+      batch.commit().then(function(){
+        ch.forEach(function(op){ if (op[1] === null) delete shadow[op[0]]; else shadow[op[0]] = op[1]; });
+        nextChunk();
+      }).catch(function(e){ if (isPermErr(e)) lostAccess(); finish(false); });
+    })();
+  })();
+}
+
+/* ----- pull: apply other devices' changes button by button ----- */
+var mediaWait = {}, dirtyAtStart = null, remoteTimer = null;
+function fetchMedia(id, cb){
+  if (mediaWait[id]){ mediaWait[id].push(cb); return; }
+  mediaWait[id] = [cb];
+  fam().collection("media").doc(id).get().then(function(s){
+    var d = s.exists ? s.data().d : null, q = mediaWait[id]; delete mediaWait[id];
+    if (d) pushedIds[id] = 1;
+    q.forEach(function(f){ f(d); });
+  }).catch(function(){ delete mediaWait[id]; });
+}
+function resolveCellMedia(b, old){
+  if (b.img && b.img.id && !b.img.d){
+    if (old && old.img && old.img.id === b.img.id && old.img.d) b.img.d = old.img.d;
+    else fetchMedia(b.img.id, function(d){ if (d && b.img){ b.img.d = d; remoteChanged(); } });
+  }
+  if (b.auRef){
+    b.auId = b.auRef; delete b.auRef;
+    if (old && old.auId === b.auId && old.au) b.au = old.au;
+    else fetchMedia(b.auId, function(d){ if (d){ b.au = d; remoteChanged(); } });
+  }
+}
+function remoteChanged(){
+  clearTimeout(remoteTimer);
+  remoteTimer = setTimeout(function(){
+    var j = JSON.stringify(board);
+    try { localStorage.setItem(LS_KEY, j); } catch(e){}
+    idbSet(LS_KEY, j);
+    saveShadow();
+    if (!board.pages[cur]){ cur = startPage(); stack = []; }
+    render();
+  }, 250);
+}
+function applyRemote(kind, ch){
+  var d = ch.doc.data(), key = kind === "pages" ? "P~" + d.pk : cellKey(d.pk, d.i);
+  if (dirtyAtStart && dirtyAtStart[key]) return;         /* this device's offline edit wins */
+  if (ch.type === "removed"){
+    if (!(key in shadow)) return;
+    delete shadow[key];
+    if (kind === "cells" && board.pages[d.pk]) delete board.pages[d.pk].cells[d.i];
+    remoteChanged(); return;
+  }
+  var val = kind === "pages" ? d.p : d.b;
+  if (shadow[key] === val) return;                        /* our own write echoing back */
+  shadow[key] = val;
+  if (kind === "pages"){
+    var pm = JSON.parse(val), pg = board.pages[d.pk] || (board.pages[d.pk] = { name: pm.name, cells: {} });
+    pg.name = pm.name;
+    if (pm.cols) pg.cols = pm.cols; else delete pg.cols;
+    if (pm.rows) pg.rows = pm.rows; else delete pg.rows;
+  } else {
+    var b = JSON.parse(val);
+    if (!board.pages[d.pk]) board.pages[d.pk] = { name: d.pk, cells: {} };
+    resolveCellMedia(b, board.pages[d.pk].cells[d.i]);
+    board.pages[d.pk].cells[d.i] = b;
+  }
+  remoteChanged();
+}
+function stopListen(){ unsubs.forEach(function(u){ try { u(); } catch(e){} }); unsubs = []; }
+function startListen(){
+  stopListen();
+  /* remember edits made while offline so the first cloud snapshot doesn't overwrite them */
+  var now = currentMap({});
+  dirtyAtStart = {};
+  Object.keys(now).forEach(function(k){ if (shadow[k] !== now[k]) dirtyAtStart[k] = 1; });
+  Object.keys(shadow).forEach(function(k){ if (!(k in now)) dirtyAtStart[k] = 1; });
+  var pending = 2;
+  ["pages", "cells"].forEach(function(kind){
+    var first = true;
+    unsubs.push(fam().collection(kind).onSnapshot(function(snap){
+      snap.docChanges().forEach(function(ch){ try { applyRemote(kind, ch); } catch(e){} });
+      if (first){
+        first = false;
+        if (--pending === 0){ dirtyAtStart = null; setStatus("Synced ✓"); pushChanges(); }
+      }
+    }, function(err){
+      if (isPermErr(err)) lostAccess();
+      else setStatus("Sync offline — device still works");
+    }));
+  });
+}
+function lostAccess(){
+  stopListen(); syncOn = false;
+  setStatus("Not connected — this device was removed from the family");
+}
+
+/* ----- family: create, pair, join, leave, delete ----- */
+function newFamilyCode(){
+  var a = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", c = "";
+  for (var i = 0; i < 8; i++) c += a[Math.floor(Math.random() * a.length)];
+  return c;
+}
+function resetSyncState(){ shadow = {}; pushedIds = {}; saveShadow(); }
+function createFamily(role, cb){
+  initFirebase(function(err){
+    if (err){ cb(err); return; }
+    var uid = myUid(), fid = genId("f") + Math.random().toString(36).slice(2, 8);
+    fam(fid).set({ owner: uid, created: Date.now() }).then(function(){
+      return fam(fid).collection("members").doc(uid).set({ role: role, device: dev.id, joined: Date.now() });
+    }).then(function(){
+      dev.fid = fid; dev.role = role; dev.owner = true; saveDev();
+      resetSyncState();
+      syncOn = true; saveUserProfile(); startListen(); cb(null);
+    }).catch(function(e){ cb("Couldn’t create the family: " + (e.message || e)); });
+  });
+}
+function makePairCode(cb){
+  var code = newFamilyCode();
+  db.collection("k2_pairs").doc(code).set({
+    fid: dev.fid, by: myUid(), exp: firebase.firestore.Timestamp.fromMillis(Date.now() + 15 * 60000)
+  }).then(function(){ cb(null, code); }).catch(function(e){ cb(e.message || "Couldn’t make a code."); });
+}
+/* replace this device's pages with the family's board */
+function loadFamilyBoard(fid, cb){
+  Promise.all([fam(fid).collection("pages").get(), fam(fid).collection("cells").get()]).then(function(r){
+    var pages = {}, sh = {};
+    r[0].forEach(function(doc){
+      var d = doc.data(), pm = JSON.parse(d.p);
+      pages[d.pk] = { name: pm.name, cells: {} };
+      if (pm.cols) pages[d.pk].cols = pm.cols;
+      if (pm.rows) pages[d.pk].rows = pm.rows;
+      sh["P~" + d.pk] = d.p;
+    });
+    r[1].forEach(function(doc){
+      var d = doc.data(), b = JSON.parse(d.b);
+      if (!pages[d.pk]) pages[d.pk] = { name: d.pk, cells: {} };
+      pages[d.pk].cells[d.i] = b;
+      sh[cellKey(d.pk, d.i)] = d.b;
+    });
+    if (!pages.home){ cb("That family doesn’t have a board yet — open Kite on the iPad first."); return; }
+    board.pages = pages; board.symAuto = true;
+    shadow = sh; pushedIds = {};
+    Object.keys(pages).forEach(function(pk){
+      Object.keys(pages[pk].cells).forEach(function(ci){ resolveCellMedia(pages[pk].cells[ci], null); });
+    });
+    ensureShape();
+    var j = JSON.stringify(board);
+    try { localStorage.setItem(LS_KEY, j); } catch(e){}
+    idbSet(LS_KEY, j); saveShadow();
+    cur = startPage(); stack = []; render();
+    cb(null);
+  }).catch(function(e){ cb(isPermErr(e) ? "This device isn’t a member of that family." : "Couldn’t load the board: " + (e.message || e)); });
+}
+function joinWithCode(code, role, cb){
+  initFirebase(function(err){
+    if (err){ cb(err); return; }
+    var fid = null;
+    db.collection("k2_pairs").doc(code).get().then(function(snap){
+      if (!snap.exists) throw new Error("That code isn’t valid — make a new one on the iPad.");
+      var p = snap.data();
+      if (p.exp && p.exp.toMillis && p.exp.toMillis() < Date.now()) throw new Error("That code expired — make a new one on the iPad.");
+      fid = p.fid;
+      return fam(fid).collection("members").doc(myUid()).set({ role: role, device: dev.id, joined: Date.now(), code: code });
+    }).then(function(){
+      loadFamilyBoard(fid, function(e2){
+        if (e2){ cb(e2); return; }
+        dev.fid = fid; dev.role = role; dev.owner = false; saveDev();
+        syncOn = true; saveUserProfile(); startListen(); cb(null);
+      });
+    }).catch(function(e){ cb(isPermErr(e) ? "That code didn’t work — make a new one on the iPad." : (e.message || "Couldn’t join.")); });
+  });
+}
+function leaveFamily(cb){
+  var fid = dev.fid, uid = myUid();
+  stopListen(); syncOn = false;
+  dev.fid = null; dev.owner = false; saveDev(); resetSyncState(); setStatus("");
+  if (db && fid && uid) fam(fid).collection("members").doc(uid).delete().then(function(){ cb(null); }).catch(function(){ cb(null); });
+  else cb(null);
+}
+/* owner only: remove every trace of the family from the cloud */
+function deleteFamily(cb){
+  var fid = dev.fid, uid = myUid();
+  stopListen(); syncOn = false;
+  function wipe(sub){
+    return fam(fid).collection(sub).get().then(function(q){
+      var docs = [];
+      q.forEach(function(d){ if (!(sub === "members" && d.id === uid)) docs.push(d.ref); });
+      var p = Promise.resolve();
+      for (var i = 0; i < docs.length; i += 400){
+        (function(slice){ p = p.then(function(){ var b = db.batch(); slice.forEach(function(r){ b.delete(r); }); return b.commit(); }); })(docs.slice(i, i + 400));
+      }
+      return p;
+    });
+  }
+  wipe("cells").then(function(){ return wipe("pages"); }).then(function(){ return wipe("media"); })
+    .then(function(){ return wipe("members"); })
+    .then(function(){ return fam(fid).delete(); })
+    .then(function(){ return fam(fid).collection("members").doc(uid).delete(); })
+    .then(function(){ return db.collection("k2_users").doc(uid).delete().catch(function(){}); })
+    .then(function(){ dev.fid = null; dev.owner = false; saveDev(); resetSyncState(); setStatus(""); cb(null); })
+    .catch(function(e){ cb("Couldn’t finish deleting: " + (e.message || e) + " — try again."); });
+}
+
+/* ----- optional account: keeps the same identity on a new device ----- */
 function friendlyAuth(e){
   var c = (e && e.code) || "";
   if (c === "auth/email-already-in-use") return "That email already has an account — use Sign in instead.";
@@ -1346,20 +1654,22 @@ function saveUserProfile(){
   try {
     var u = firebase.auth().currentUser;
     if (!db || !u || u.isAnonymous) return;
-    db.collection("users").doc(u.uid).set({ email: u.email || null, role: dev.role || "child", code: dev.code || null, updated: Date.now() }, { merge: true });
+    db.collection("k2_users").doc(u.uid).set({ email: u.email || null, role: dev.role || "child", fid: dev.fid || null, updated: Date.now() }, { merge: true });
   } catch(e){}
 }
 function recoverProfile(cb){
   try {
     var u = firebase.auth().currentUser;
     if (!db || !u){ cb(null); return; }
-    db.collection("users").doc(u.uid).get().then(function(snap){
+    db.collection("k2_users").doc(u.uid).get().then(function(snap){
       var d = snap.exists ? snap.data() : null;
-      if (d && d.code && !dev.code){
-        dev.code = d.code; if (d.role) dev.role = d.role; saveDev();
-        syncOn = true; startListen(); setStatus("Restoring your board…");
-      } else { saveUserProfile(); }
-      cb(null);
+      if (d && d.fid && !dev.fid){
+        setStatus("Restoring your board…");
+        loadFamilyBoard(d.fid, function(e2){
+          if (!e2){ dev.fid = d.fid; if (d.role) dev.role = d.role; saveDev(); syncOn = true; startListen(); }
+          cb(null);
+        });
+      } else { saveUserProfile(); cb(null); }
     }).catch(function(){ cb(null); });
   } catch(e){ cb(null); }
 }
@@ -1367,14 +1677,14 @@ function signUpEmail(email, pass, cb){
   initFirebase(function(err){
     if (err){ cb(err); return; }
     var au = firebase.auth(), u = au.currentUser;
-    function after(){ saveUserProfile(); if (dev.code){ syncOn = true; startListen(); } cb(null); }
+    function after(){ saveUserProfile(); cb(null); }
     try {
       var cred = firebase.auth.EmailAuthProvider.credential(email, pass);
       if (u && u.isAnonymous){
+        /* linking keeps the same identity, so this device stays a family member */
         u.linkWithCredential(cred).then(after).catch(function(er){
-          if (er.code === "auth/email-already-in-use" || er.code === "auth/credential-already-in-use"){
-            au.signInWithEmailAndPassword(email, pass).then(function(){ recoverProfile(cb); }).catch(function(x){ cb(friendlyAuth(x)); });
-          } else cb(friendlyAuth(er));
+          if (er.code === "auth/email-already-in-use" || er.code === "auth/credential-already-in-use") cb("That email already has an account — use Sign in instead.");
+          else cb(friendlyAuth(er));
         });
       } else {
         au.createUserWithEmailAndPassword(email, pass).then(after).catch(function(er){ cb(friendlyAuth(er)); });
@@ -1393,7 +1703,7 @@ function signInGoogle(cb){
     if (err){ cb(err); return; }
     var au = firebase.auth(), u = au.currentUser, prov = new firebase.auth.GoogleAuthProvider();
     var op = (u && u.isAnonymous) ? u.linkWithPopup(prov) : au.signInWithPopup(prov);
-    op.then(function(){ recoverProfile(cb); }).catch(function(er){
+    op.then(function(){ saveUserProfile(); recoverProfile(cb); }).catch(function(er){
       if (er.code === "auth/credential-already-in-use" || er.code === "auth/email-already-in-use"){
         au.signInWithPopup(prov).then(function(){ recoverProfile(cb); }).catch(function(x){ cb(friendlyAuth(x)); });
       } else cb(friendlyAuth(er));
@@ -1401,218 +1711,159 @@ function signInGoogle(cb){
   });
 }
 function signOutAcct(cb){
+  /* signing out changes this device's identity, so it also disconnects from the family */
+  stopListen(); syncOn = false; dev.fid = null; dev.owner = false; saveDev(); resetSyncState(); setStatus("");
   try { firebase.auth().signOut().then(function(){ firebase.auth().signInAnonymously().then(function(){ if(cb)cb(); }).catch(function(){ if(cb)cb(); }); }).catch(function(){ if(cb)cb(); }); }
   catch(e){ if(cb)cb(); }
 }
 
-/* board doc stays under Firestore's 1MB limit: images/recordings are split into media docs */
-function stripMedia(){
-  var media = {};
-  Object.keys(board.pages).forEach(function(pk){
-    var cells = board.pages[pk].cells;
-    Object.keys(cells).forEach(function(ci){
-      var b = cells[ci];
-      if (b.img && b.img.d && !b.img.id) b.img.id = genId("m");
-      if (b.au && !b.auId) b.auId = genId("a");
-    });
-  });
-  var clean = JSON.parse(JSON.stringify(board));
-  Object.keys(board.pages).forEach(function(pk){
-    var cells = board.pages[pk].cells;
-    Object.keys(cells).forEach(function(ci){
-      var b = cells[ci], cb2 = clean.pages[pk].cells[ci];
-      if (b.img && b.img.d && b.img.id){ media[b.img.id] = b.img.d; cb2.img = { id: b.img.id }; }
-      if (b.au && b.auId){ media[b.auId] = b.au; cb2.au = null; cb2.auRef = b.auId; }
-    });
-  });
-  delete clean.settings; delete clean.pin;
-  return { clean: clean, media: media };
+/* ----- the sync screen ----- */
+var ROLE_NAMES = { child: "Child’s talker", parent: "Parent / caregiver", therapist: "Therapist / teacher" };
+function roleSelect(id, sel){
+  return '<select id="'+id+'">' + ["parent","therapist","child"].map(function(r){
+    return '<option value="'+r+'"'+(sel===r?" selected":"")+'>'+ROLE_NAMES[r]+(r==="child"?" (another talker)":"")+'</option>';
+  }).join("") + '</select>';
 }
-function resolveMedia(clean, cb){
-  var local = {};
-  Object.keys(board.pages || {}).forEach(function(pk){
-    var cs = board.pages[pk].cells;
-    Object.keys(cs).forEach(function(ci){
-      var b = cs[ci];
-      if (b.img && b.img.id && b.img.d) local[b.img.id] = b.img.d;
-      if (b.auId && b.au) local[b.auId] = b.au;
-    });
-  });
-  var need = {};
-  Object.keys(clean.pages).forEach(function(pk){
-    var cs = clean.pages[pk].cells;
-    Object.keys(cs).forEach(function(ci){
-      var b = cs[ci];
-      if (b.img && b.img.id){ if (local[b.img.id]) b.img.d = local[b.img.id]; else need[b.img.id] = true; }
-      if (b.auRef){ if (local[b.auRef]){ b.au = local[b.auRef]; b.auId = b.auRef; } else need[b.auRef] = true; }
-    });
-  });
-  var ids = Object.keys(need), got = {};
-  if (!ids.length){ cb(clean); return; }
-  var i = 0;
-  function fin(){
-    Object.keys(clean.pages).forEach(function(pk){
-      var cs = clean.pages[pk].cells;
-      Object.keys(cs).forEach(function(ci){
-        var b = cs[ci];
-        if (b.img && b.img.id && got[b.img.id]) b.img.d = got[b.img.id];
-        if (b.auRef && got[b.auRef]){ b.au = got[b.auRef]; b.auId = b.auRef; }
-      });
-    });
-    cb(clean);
-  }
-  function step(){
-    if (i >= ids.length){ fin(); return; }
-    var id = ids[i++];
-    db.collection("families").doc(dev.code).collection("media").doc(id).get()
-      .then(function(snap){ if (snap.exists) got[id] = snap.data().d; step(); })
-      .catch(step);
-  }
-  step();
-}
-function schedulePush(){
-  if (!syncOn || applyingRemote) return;
-  clearTimeout(pushTimer);
-  pushTimer = setTimeout(pushBoard, 1500);
-}
-function pushBoard(){
-  if (!syncOn || !db) return;
-  setStatus("Syncing…");
-  var sm = stripMedia();
-  try { localStorage.setItem(LS_KEY, JSON.stringify(board)); } catch(e){}
-  var ids = Object.keys(sm.media).filter(function(id){ return !pushedIds[id]; });
-  var i = 0;
-  function step(){
-    if (i >= ids.length){
-      db.collection("families").doc(dev.code)
-        .set({ board: JSON.stringify(sm.clean), rev: Date.now(), src: dev.id })
-        .then(function(){ setStatus("Synced ✓"); })
-        .catch(function(){ setStatus("Sync error — will retry on next change"); });
-      return;
-    }
-    var id = ids[i++];
-    db.collection("families").doc(dev.code).collection("media").doc(id).set({ d: sm.media[id] })
-      .then(function(){
-        pushedIds[id] = 1;
-        try { localStorage.setItem("kite2_pushed", JSON.stringify(pushedIds)); } catch(e){}
-        step();
-      }).catch(step);
-  }
-  step();
-}
-function startListen(){
-  if (unsubBoard) unsubBoard();
-  unsubBoard = db.collection("families").doc(dev.code).onSnapshot(function(snap){
-    if (!snap.exists) return;
-    var d = snap.data();
-    if (d.src === dev.id) return;
-    try {
-      var clean = JSON.parse(d.board);
-      applyingRemote = true;
-      resolveMedia(clean, function(nb){
-        nb.settings = board.settings; nb.pin = board.pin;
-        if (!nb.targets) nb.targets = board.targets || [];
-        board = nb;
-        try { localStorage.setItem(LS_KEY, JSON.stringify(board)); } catch(e){}
-        if (!board.pages[cur]){ cur = "home"; stack = []; }
-        renderSent(); render();
-        setStatus("Synced ✓"); toast("Board updated ✓");
-        applyingRemote = false;
-      });
-    } catch(e){ applyingRemote = false; }
-  }, function(){ setStatus("Sync offline — device still works"); });
-}
-function newFamilyCode(){
-  var a = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", c = "";
-  for (var i=0;i<8;i++) c += a[Math.floor(Math.random()*a.length)];
-  return c;
-}
-function connectFamily(mode, code, cb){
-  initFirebase(function(err){
-    if (err){ cb(err); return; }
-    if (mode === "create"){
-      dev.code = code; saveDev();
-      syncOn = true; pushBoard(); startListen(); saveUserProfile(); cb(null);
-    } else {
-      db.collection("families").doc(code).get().then(function(snap){
-        if (!snap.exists){ cb("No family found with that code — check it and try again."); return; }
-        dev.code = code; saveDev(); syncOn = true; startListen(); saveUserProfile(); cb(null);
-      }).catch(function(e){ cb("Couldn’t connect: " + e.message); });
-    }
-  });
-}
-function openSyncDlg(){
+function acctBlock(){
   var cu = (window.firebase && firebase.auth && firebase.auth().currentUser) || null;
   var emailUser = (cu && !cu.isAnonymous) ? (cu.email || "your account") : null;
-  var acctHtml = emailUser
-    ? '<div style="background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px">✓ Signed in as <b>'+esc(emailUser)+'</b> — your board is backed up to your account and can be restored on any device.</div>' +
-      '<div class="btnrow"><button class="btn ghost" id="acSignOut">Sign out</button></div>'
-    : '<div class="note">💾 Create a free account to back up your board and restore it on any device — even if you lose your family code.</div>' +
-      '<div class="btnrow"><button class="btn primary" id="acCreate">Create free account</button><button class="btn ghost" id="acSignIn">Sign in</button></div>';
-  var connected = syncOn && dev.code;
-  openOv('<h3>☁ Account &amp; sync</h3>' + acctHtml +
-    '<hr style="border:none;border-top:1px solid var(--soft);margin:14px 0">' +
-    (connected
-      ? '<p class="sub">Connected to family <b style="font-size:17px;letter-spacing:2px">'+esc(dev.code)+'</b> as <b>'+(dev.role==="parent"?"parent phone":"child device")+'</b>. Edits sync automatically. Enter this code on other devices to join.</p>' +
-        '<div class="btnrow"><button class="btn danger" id="sydis">Disconnect this device</button></div>' +
-        '<div class="btnrow"><button class="btn" id="syc">Close</button></div>'
-      : '<p class="sub">Create your family on the child’s device first, then join with the code on the other devices.</p>' +
-        '<label>This device is…</label><select id="syrole">' +
-          '<option value="child"'+(dev.role==="child"?" selected":"")+'>The child’s talker (iPad)</option>' +
-          '<option value="parent"'+(dev.role==="parent"?" selected":"")+'>A parent/caregiver phone</option></select>' +
-        '<div class="btnrow"><button class="btn primary" id="synew">Create new family</button></div>' +
-        '<label>Or join with a family code</label>' +
-        '<div style="display:flex;gap:6px"><input type="text" id="sycode" placeholder="e.g. K7MP2XQA" style="flex:1;text-transform:uppercase"><button class="btn primary" id="syjoin" style="flex:0 0 auto;padding:8px 14px">Join</button></div>' +
-        '<div class="note" id="symsg"></div>' +
-        '<div class="btnrow"><button class="btn" id="syc">Close</button></div>')
-  );
-  ovbox.querySelector("#syc").addEventListener("click", openSettings);
+  return emailUser
+    ? '<div class="note">✓ Signed in as <b>'+esc(emailUser)+'</b> — sign in on a new device to get this board back.</div><div class="btnrow"><button class="btn ghost" id="acSignOut">Sign out</button></div>'
+    : '<div class="note">Optional: a free account lets you get this board back on a new device if this one is lost.</div><div class="btnrow"><button class="btn ghost" id="acCreate">Create free account</button><button class="btn ghost" id="acSignIn">Sign in</button></div>';
+}
+function wireAcct(){
   var el;
   if ((el = ovbox.querySelector("#acCreate"))) el.addEventListener("click", function(){ openAccountDlg("signup"); });
   if ((el = ovbox.querySelector("#acSignIn"))) el.addEventListener("click", function(){ openAccountDlg("signin"); });
-  if ((el = ovbox.querySelector("#acSignOut"))) el.addEventListener("click", function(){ signOutAcct(function(){ toast("Signed out."); openSyncDlg(); }); });
-  if (connected){
-    ovbox.querySelector("#sydis").addEventListener("click", function(){
-      if (unsubBoard) unsubBoard();
-      syncOn = false; dev.code = null; saveDev(); setStatus("");
-      toast("Disconnected — this device is now standalone.");
-      openSettings();
+  if ((el = ovbox.querySelector("#acSignOut"))) el.addEventListener("click", function(){
+    if (!confirm("Signing out disconnects this device from the family. Continue?")) return;
+    signOutAcct(function(){ toast("Signed out."); openSyncDlg(); });
+  });
+}
+function openSyncDlg(){
+  var connected = syncOn && dev.fid;
+  if (!connected){
+    openOv('<h3>☁ Phone sync</h3>' +
+      '<p class="sub">Edit the board from your phone while your child keeps their talker. Changes show up on every connected device.</p>' +
+      '<label style="margin-top:4px">On the child’s iPad</label>' +
+      '<button class="btn primary" id="synew" style="width:100%">Start a family on this device</button>' +
+      '<label>On a phone or another device</label>' +
+      '<div class="note" style="margin-top:0">On the iPad, tap ☁ Phone sync → Add a device. Then point this phone’s camera at the QR code — or type the code here:</div>' +
+      '<div style="display:flex;gap:6px;margin-top:6px"><input type="text" id="sycode" placeholder="e.g. K7MP2XQA" maxlength="8" style="flex:1;text-transform:uppercase;letter-spacing:2px"><button class="btn primary" id="syjoin" style="flex:0 0 auto;padding:8px 14px">Join</button></div>' +
+      '<label>This device is a…</label>' + roleSelect("syrole", "parent") +
+      '<div class="note" id="symsg"></div>' +
+      '<hr style="border:none;border-top:1px solid var(--soft);margin:14px 0">' + acctBlock() +
+      '<div class="btnrow"><button class="btn" id="syc">Close</button></div>');
+    ovbox.querySelector("#syc").addEventListener("click", openSettings);
+    wireAcct();
+    ovbox.querySelector("#synew").addEventListener("click", function(){
+      var msg = ovbox.querySelector("#symsg");
+      msg.textContent = "Setting up…";
+      createFamily("child", function(err){
+        if (err){ msg.textContent = err; return; }
+        toast("Family created ✓ Now add your phone.");
+        openPairDlg();
+      });
+    });
+    ovbox.querySelector("#syjoin").addEventListener("click", function(){
+      var code = ovbox.querySelector("#sycode").value.trim().toUpperCase(), msg = ovbox.querySelector("#symsg");
+      if (code.length !== 8){ msg.textContent = "Enter the 8-letter code from the iPad."; return; }
+      if (!confirm("Joining replaces this device’s board with the family’s board. Continue?")) return;
+      msg.textContent = "Joining…";
+      joinWithCode(code, ovbox.querySelector("#syrole").value, function(err){
+        if (err){ msg.textContent = err; return; }
+        closeOv(); toast("Joined ✓ — this device now has the family’s board.");
+      });
     });
     return;
   }
-  function prep(cb){
-    if (!dev.fb) dev.fb = DEFAULT_FB;
-    dev.role = ovbox.querySelector("#syrole").value;
-    saveDev(); cb();
-  }
-  ovbox.querySelector("#synew").addEventListener("click", function(){
-    prep(function(){
-      var code = newFamilyCode();
-      ovbox.querySelector("#symsg").textContent = "Connecting…";
-      connectFamily("create", code, function(err){
-        if (err){ ovbox.querySelector("#symsg").textContent = err; return; }
-        toast("Family created ✓ Code: " + code);
-        openSyncDlg();
-      });
+  openOv('<h3>☁ Phone sync</h3>' +
+    '<p class="sub">Connected ✓ This device: <b>'+esc(ROLE_NAMES[dev.role] || dev.role)+'</b>. Edits on any device show up on the others within seconds.</p>' +
+    '<button class="btn primary" id="sypair" style="width:100%">＋ Add a device (shows a QR code)</button>' +
+    '<label>Connected devices</label><div id="symem" class="note" style="margin-top:0">Loading…</div>' +
+    '<hr style="border:none;border-top:1px solid var(--soft);margin:14px 0">' + acctBlock() +
+    '<div class="btnrow"><button class="btn danger" id="sydis">Disconnect this device</button></div>' +
+    (dev.owner ? '<div class="btnrow"><button class="btn danger" id="sydel">Delete family &amp; all cloud data</button></div>' : '') +
+    '<div class="btnrow"><button class="btn" id="syc">Close</button></div>');
+  ovbox.querySelector("#syc").addEventListener("click", openSettings);
+  wireAcct();
+  ovbox.querySelector("#sypair").addEventListener("click", openPairDlg);
+  ovbox.querySelector("#sydis").addEventListener("click", function(){
+    if (!confirm("Disconnect this device? Its board stays on it, but it stops syncing.")) return;
+    leaveFamily(function(){ toast("Disconnected — this device is now on its own."); openSyncDlg(); });
+  });
+  var del = ovbox.querySelector("#sydel");
+  if (del) del.addEventListener("click", function(){
+    if (!confirm("Delete this family from the cloud? Every device stops syncing and all cloud copies, photos and recordings are erased. Each device keeps its own board.")) return;
+    del.textContent = "Deleting…";
+    deleteFamily(function(err){
+      if (err){ toast(err); openSyncDlg(); return; }
+      toast("Family deleted from the cloud."); openSyncDlg();
     });
   });
-  ovbox.querySelector("#syjoin").addEventListener("click", function(){
-    prep(function(){
-      var code = ovbox.querySelector("#sycode").value.trim().toUpperCase();
-      if (code.length < 6){ ovbox.querySelector("#symsg").textContent = "Enter the family code."; return; }
-      ovbox.querySelector("#symsg").textContent = "Connecting…";
-      connectFamily("join", code, function(err){
-        if (err){ ovbox.querySelector("#symsg").textContent = err; return; }
-        toast("Joined family ✓ — board will arrive in a moment.");
-        openSyncDlg();
+  /* device list — owner can remove a lost phone */
+  var me = myUid();
+  fam().collection("members").get().then(function(q){
+    var el = ovbox.querySelector("#symem"); if (!el) return;
+    var rows = [];
+    q.forEach(function(d){
+      var m = d.data(), mine = d.id === me;
+      rows.push('<div style="display:flex;align-items:center;gap:8px;margin:6px 0;padding:8px 10px;background:var(--soft);border-radius:10px;color:var(--text);font-size:14px">' +
+        '<div style="flex:1"><b>'+esc(ROLE_NAMES[m.role] || m.role || "Device")+'</b>'+(mine?' · this device':'')+'<br><span style="color:var(--muted);font-size:12px">joined '+new Date(m.joined||0).toLocaleDateString()+'</span></div>' +
+        ((dev.owner && !mine) ? '<button class="btn ghost sym-rm" data-u="'+esc(d.id)+'" style="flex:0 0 auto;padding:6px 12px">Remove</button>' : '') + '</div>');
+    });
+    el.innerHTML = rows.join("") || "No devices yet.";
+    Array.prototype.forEach.call(el.querySelectorAll(".sym-rm"), function(bt){
+      bt.addEventListener("click", function(){
+        if (!confirm("Remove this device? It will stop syncing right away.")) return;
+        fam().collection("members").doc(bt.getAttribute("data-u")).delete().then(function(){ toast("Removed."); openSyncDlg(); }).catch(function(){ toast("Couldn’t remove — check internet."); });
       });
+    });
+  }).catch(function(){ var el = ovbox.querySelector("#symem"); if (el) el.textContent = "Couldn’t load the device list (offline?)."; });
+}
+/* QR pairing: a 15-minute code, shown as a QR that opens Kite with the code filled in */
+function joinLink(code){ return location.origin + location.pathname + "?join=" + code; }
+function openPairDlg(){
+  openOv('<h3>Add a device</h3><p class="sub">Point the phone’s camera at this code. It opens Kite and joins this family.</p>' +
+    '<div id="qrbox" style="display:flex;justify-content:center;align-items:center;min-height:220px;background:#fff;border-radius:14px;padding:10px"><span class="note">Making a code…</span></div>' +
+    '<div style="text-align:center;margin-top:10px"><div class="note" style="margin:0">Or type this code on the phone</div><div id="paircode" style="font-size:28px;font-weight:700;letter-spacing:4px">········</div><div class="note" id="qrexp">Works for 15 minutes, for joining only.</div></div>' +
+    '<div class="btnrow"><button class="btn" id="qrc">Done</button></div>');
+  ovbox.querySelector("#qrc").addEventListener("click", openSyncDlg);
+  makePairCode(function(err, code){
+    var box = ovbox.querySelector("#qrbox"); if (!box) return;
+    if (err){ box.innerHTML = '<span class="note">Couldn’t make a code: '+esc(err)+'</span>'; return; }
+    ovbox.querySelector("#paircode").textContent = code;
+    function draw(){
+      try { var q = qrcode(0, "M"); q.addData(joinLink(code)); q.make(); box.innerHTML = q.createSvgTag(6, 2); }
+      catch(e){ box.innerHTML = '<span class="note">Type the code below on the phone.</span>'; }
+    }
+    if (typeof window.qrcode === "function") draw(); else loadScript("qrcode.js", function(e){ if (e) box.innerHTML = '<span class="note">Type the code below on the phone.</span>'; else draw(); });
+  });
+}
+/* opened from a QR scan: ?join=CODE */
+function handleJoinLink(){
+  var m = /[?&]join=([A-Za-z0-9]{8})/.exec(location.search);
+  if (!m) return;
+  try { history.replaceState(null, "", location.pathname); } catch(e){}
+  var code = m[1].toUpperCase();
+  if (dev.fid && syncOn){ toast("This device is already connected to a family."); return; }
+  openOv('<h3>Join this family?</h3><p class="sub">This device will get the family’s board and stay in sync with it. Anything already on this device’s board is replaced.</p>' +
+    '<label>This device is a…</label>' + roleSelect("jrole", "parent") +
+    '<div class="note" id="jmsg"></div>' +
+    '<div class="btnrow"><button class="btn" id="jno">Not now</button><button class="btn primary" id="jyes">Join</button></div>');
+  ovbox.querySelector("#jno").addEventListener("click", closeOv);
+  ovbox.querySelector("#jyes").addEventListener("click", function(){
+    var msg = ovbox.querySelector("#jmsg"); msg.textContent = "Joining…";
+    joinWithCode(code, ovbox.querySelector("#jrole").value, function(err){
+      if (err){ msg.textContent = err; return; }
+      closeOv(); toast("Joined ✓ — edits here show up on the iPad.");
     });
   });
 }
 function openAccountDlg(mode){
   var isUp = mode !== "signin";
   openOv('<h3>'+(isUp?"Create a free account":"Sign in")+'</h3>' +
-    '<p class="sub">'+(isUp?"Back up your board and restore it on any device — even if you lose your family code. Free forever.":"Sign in to restore your board on this device.")+'</p>' +
+    '<p class="sub">'+(isUp?"Lets you get this board back on a new device if this one is lost. Free.":"Sign in to get your family’s board on this device.")+'</p>' +
     '<label>Email</label><input type="email" id="acEmail" autocomplete="email" placeholder="you@example.com">' +
     '<label>Password</label><input type="password" id="acPass" placeholder="at least 6 characters">' +
     '<div class="note">By continuing you agree to the <a href="privacy.html" target="_blank" style="color:var(--accent)">privacy &amp; data policy</a>. No ads, no tracking, no selling data — ever.</div>' +
@@ -1628,7 +1879,7 @@ function openAccountDlg(mode){
     msg.textContent = "Working…";
     (isUp?signUpEmail:signInEmail)(em, pw, function(err){
       if (err){ msg.textContent = err; return; }
-      toast(isUp ? "Account created ✓ Board backed up." : "Signed in ✓");
+      toast(isUp ? "Account created ✓" : "Signed in ✓");
       openSyncDlg();
     });
   });
@@ -1978,13 +2229,14 @@ function startApp(){
   renderSent();
   render();
   setTimeout(autoSymbols, 600);
-  if (dev.fb && dev.code){
+  if (dev.fid){
     setStatus("Connecting…");
     initFirebase(function(err){
       if (err){ setStatus("Sync offline — device still works"); return; }
-      syncOn = true; startListen(); setStatus("Synced ✓");
+      syncOn = true; startListen();
     });
   }
+  setTimeout(handleJoinLink, 300);
   if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
     try { navigator.serviceWorker.register("sw.js").catch(function(){}); } catch(e){}
   }

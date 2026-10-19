@@ -12,7 +12,7 @@ Working copy of Kite for the tiered-board rebuild (Levels 1–3). The original a
 | IndexedDB | `kite_db` | `kite2_db` |
 | Offline cache | `kite-v1` | `kite2-v1` |
 
-**Not yet separated:** cloud sync. v2 still talks to the same Firebase project and family documents as v1. Don't connect a real family's devices to v2 until sync is rebuilt.
+**Cloud sync** is separate from v1: v2 uses its own `k2_*` collections in the same Firebase project.
 
 ## Removed from v1
 
@@ -43,3 +43,14 @@ Every button carries `lv` (lowest level it appears at). Hidden buttons keep thei
 Live at **https://alexanderjrupp-jpg.github.io/kite/v2/**. GitHub Pages publishes from `main`, so pushing changes to `v2/` updates it.
 
 v1 and v2 share the same web address (origin), so v2's service worker only ever clears its own `kite2-` caches, never v1's.
+
+## Phone sync
+
+- **Start:** on the child's iPad, Settings → Phone sync → *Start a family on this device*. That device owns the family.
+- **Add a device:** *Add a device* shows a QR code (and an 8-letter code) that works for 15 minutes. The phone's camera opens Kite with the code filled in; the phone joins as parent/caregiver, therapist/teacher, or another talker, and gets the family's board.
+- **Only members can read or write a family.** The code is a one-time key for joining, not the lock. The owner can see connected devices and remove a lost one, or delete the whole family from the cloud.
+- **One document per button.** Two people editing different buttons never overwrite each other. Edits made offline are kept and pushed on reconnect.
+- **Optional account** (email or Google) keeps the same identity on a new device, so the board can be restored.
+- Connected parent/therapist devices edit without the PIN.
+
+Data layout and the security rules are in `firestore.rules` (paste into Firebase console → Firestore Database → Rules). The QR generator is `qrcode.js` (MIT, Kazuhiko Arase).
