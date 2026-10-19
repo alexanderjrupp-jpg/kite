@@ -8,19 +8,22 @@
 <title>Kite v2</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
-<meta name="theme-color" content="#6C5CE7">
+<meta name="theme-color" content="#5141C9">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:#E9E5F6; --bgfx:linear-gradient(160deg,#E5DFF6 0%,#EDE3F3 55%,#E1E7F6 100%);
-    --panel:#FFFFFF; --border:#E4E5F1; --soft:#EEEFF8;
-    --text:#232838; --muted:#7B8296; --accent:#6C5CE7; --accent2:#F06BA8; --accent3:#14B8A6;
-    --accsoft:rgba(108,92,231,.10);
-    --sentbg:linear-gradient(135deg,#FFF6E1,#FFEFF7); --sentborder:#F0DFC0;
-    --tipbg:#FFF6E1; --tipborder:#F0E1AF;
-    --good:#2F8A3C; --bad:#C0392B; --chip:#FFFFFF; --empty:#DCDEF0; --emptyedit:#AEB5D8;
-    --shadow:0 2px 6px rgba(80,70,150,.12);
-    --surface:rgba(255,255,255,.55); --surfborder:rgba(255,255,255,.75); --glass:rgba(255,255,255,.72);
-    --ambient:0 3px 10px rgba(80,70,150,.10);
+    --bg:#F7F6FB; --bgfx:none;
+    --panel:#FFFFFF; --border:#D9D6E6; --soft:#EFEDF6;
+    --text:#1F1A33; --muted:#5B5670; --accent:#5141C9; --accent2:#5141C9; --accent3:#14B8A6;
+    --accsoft:rgba(81,65,201,.10);
+    --sentbg:#FFFFFF; --sentborder:#D9D6E6;
+    --tipbg:#F1EEFF; --tipborder:#D6CFFA;
+    --good:#2F8A3C; --bad:#C0392B; --chip:#FFFFFF; --empty:#E7E4F0; --emptyedit:#A9A4BD;
+    --shadow:0 1px 2px rgba(31,26,51,.10);
+    --surface:transparent; --surfborder:transparent; --glass:#FFFFFF;
+    --ambient:none;
     --kitetail:#22306E;
   }
   body.dark {
@@ -28,7 +31,7 @@
     --panel:#1B1E2B; --border:#2D3143; --soft:#252939;
     --text:#E9EBF4; --muted:#9BA2B6; --accent:#8B7CF7; --accent2:#F472B6; --accent3:#2DD4BF;
     --accsoft:rgba(139,124,247,.16);
-    --sentbg:linear-gradient(135deg,#28223A,#2A1E30); --sentborder:#453B60;
+    --sentbg:#1B1E2B; --sentborder:#2D3143;
     --tipbg:#2F2A1E; --tipborder:#4C4531;
     --good:#5BBF6A; --bad:#E07060; --chip:#252939; --empty:#2B2F42; --emptyedit:#4C5375;
     --shadow:0 2px 6px rgba(0,0,0,.45);
@@ -47,7 +50,7 @@
   }
   body.hc #gridwrap { background:#ffffff; }
   body.hc #grid { gap:9px; }
-  body.hc .cell .pic { background:#fff !important; border:3px solid #000; box-shadow:0 3px 0 #000; }
+  body.hc .cell:not(.empty) { background:#fff !important; border:3px solid #000 !important; }
   body.hc .cell .lab { color:#000; font-weight:700; }
   body.hc .cell .foldmark, body.hc .cell .editmark { color:#000; }
   body.hc #sent .chip { background:#fff !important; border:2px solid #000; color:#000; }
@@ -61,7 +64,7 @@
   }
   body.cvi #gridwrap { background:#000; }
   body.cvi #grid { gap:12px; }
-  body.cvi .cell .pic { background:#000 !important; border:3px solid #fff; box-shadow:none; border-radius:12px; }
+  body.cvi .cell:not(.empty) { background:#000 !important; border:3px solid #fff !important; }
   body.cvi .cell .lab { color:#fff; font-weight:700; }
   body.cvi .cell .foldmark, body.cvi .cell .editmark { color:#fff; }
   body.cvi #sent { background:#000; }
@@ -69,7 +72,7 @@
   body.cvi #navbar, body.cvi #botbar, body.cvi #topbar { background:#000; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin:0; padding:0; height:100%; overflow:hidden;
-    font-family:ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-family:"Atkinson Hyperlegible",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     background:var(--bg); background-image:var(--bgfx); background-attachment:fixed;
     color:var(--text); -webkit-user-select:none; user-select:none;
     -webkit-touch-callout:none; transition:background .25s; }
@@ -79,56 +82,64 @@
 
   /* Sentence bar */
   #topbar { display:flex; align-items:stretch; gap:6px; padding:10px 10px 4px; background:transparent; }
-  #sent { flex:1; min-height:64px; display:flex; align-items:center; gap:6px; overflow-x:auto; padding:4px 10px; background:var(--sentbg); border:1px solid var(--sentborder); border-radius:16px; }
+  #sent { flex:1; min-height:64px; display:flex; align-items:center; gap:6px; overflow-x:auto; padding:4px 10px; background:var(--sentbg); border:1px solid var(--sentborder); border-radius:14px; }
   #sent .chip { flex:0 0 auto; display:flex; flex-direction:column; align-items:center; padding:3px 8px; background:var(--chip); border:none; border-radius:12px; font-size:12px; cursor:pointer; max-width:90px; box-shadow:0 2px 0 var(--edge, var(--border)); }
   #sent .chip img { width:26px; height:26px; object-fit:contain; }
   #sent .chip .em { font-size:22px; line-height:26px; }
   #sent .hint { color:var(--muted); font-size:15px; }
-  .tbtn { border:none; min-width:58px; padding:0 14px; border-radius:16px; font-size:20px; background:var(--glass); color:var(--text); cursor:pointer; box-shadow:var(--ambient); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
+  .tbtn { border:1px solid var(--border); min-width:58px; padding:0 14px; border-radius:14px; font-size:20px; background:var(--panel); color:var(--text); cursor:pointer; font-family:inherit; }
   .tbtn:active { filter:brightness(.92); transform:translateY(1px); }
-  #spk { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:16px; font-weight:700; box-shadow:var(--shadow); }
+  #spk { background:var(--accent); border-color:var(--accent); color:#fff; font-size:17px; font-weight:700; padding:0 22px; }
 
   /* Nav bar */
   #navbar { display:flex; align-items:center; gap:8px; padding:6px 14px; background:transparent; color:var(--text); }
   #brand { display:flex; align-items:center; gap:6px; margin-right:2px; }
-  #brand span { font-size:17px; font-weight:800; letter-spacing:.3px;
-    background:linear-gradient(120deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  #brand span { font-size:17px; font-weight:700; letter-spacing:.3px; color:var(--accent); }
+  #lvBadge { font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--accent); background:var(--accsoft); border-radius:999px; padding:4px 10px; }
   #brand svg { transform:rotate(8deg); }
-  #navbar button { border:none; background:var(--accsoft); color:var(--accent); border-radius:999px; padding:7px 14px; font-size:14px; font-weight:700; cursor:pointer; }
-  #crumb { font-size:17px; font-weight:800; flex:1; text-align:center;
-    background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  #navbar button { border:1px solid var(--border); background:var(--panel); color:var(--text); border-radius:12px; padding:7px 14px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; }
+  #crumb { font-size:18px; font-weight:700; flex:1; text-align:center; color:var(--text); }
   #enote { font-size:12px; color:var(--muted); display:none; }
 
-  /* Grid — frosted board surface the buttons live on */
-  #gridwrap { flex:1; overflow:hidden; padding:10px; margin:2px 10px 4px; background:var(--surface); border:1px solid var(--surfborder);
-    border-radius:26px; box-shadow:var(--ambient); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); }
-  #grid { display:grid; gap:6px; height:100%; }
-  /* iPhone-home-screen style: squircle icon tile, label below on the wallpaper */
-  .cell { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px;
-    cursor:pointer; text-align:center; overflow:visible; padding:1px; border:none; background:transparent; box-shadow:none; }
-  .cell .pic { flex:1; width:100%; min-height:0; display:flex; align-items:center; justify-content:center;
-    background:var(--tile, var(--panel)); border-radius:18px;
-    border:2px solid var(--edge, var(--border));
-    box-shadow:0 3px 0 var(--edge, transparent), var(--ambient);
-    transition:transform .09s, box-shadow .09s; }
-  .cell:active .pic { transform:translateY(3px); box-shadow:0 0 0 var(--edge, transparent), 0 1px 3px rgba(0,0,0,.12); }
-  .cell .pic img { max-width:84%; max-height:88%; object-fit:contain; border-radius:12px; }
-  .cell .pic .em { font-size:clamp(16px,4.4vmin,36px); line-height:1; }
-  .cell .lab { font-size:clamp(9px,1.6vmin,13px); font-weight:600; line-height:1.32; width:100%; color:var(--text);
+  /* Grid — color-coded tiles on a flat field (matches the layout canvas) */
+  #gridwrap { flex:1; overflow:hidden; padding:4px 12px 6px; }
+  #grid { display:grid; gap:8px; height:100%; }
+  #grid.big { gap:16px; max-width:min(100%, 120vh); margin:0 auto; }
+  .cell { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    cursor:pointer; text-align:center; overflow:hidden; padding:4px 3px 5px; min-width:0; min-height:0;
+    background:var(--tile, var(--panel)); border:2px solid var(--edge, var(--border)); border-radius:12px;
+    transition:transform .08s, filter .08s; }
+  .cell.folder { border-top-width:6px; }
+  .cell:active { transform:scale(.96); filter:brightness(.95); }
+  .cell .pic { flex:1; width:100%; min-height:0; display:flex; align-items:center; justify-content:center; }
+  .cell .pic img { max-width:80%; max-height:100%; object-fit:contain; }
+  .cell .pic .em { font-size:clamp(14px,3.6vmin,32px); line-height:1; }
+  .cell .lab { font-size:clamp(10px,1.9vmin,17px); font-weight:700; line-height:1.15; width:100%; color:var(--text);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .cell.empty { cursor:default; }
-  .cell.empty:active { transform:none; }
-  .cell.empty.editing { border:1.5px dashed var(--emptyedit); border-radius:18px; cursor:pointer; }
+  #grid.big .cell { border-width:3px; border-radius:20px; gap:6px; }
+  #grid.big .cell .pic .em { font-size:clamp(36px,11vmin,96px); }
+  #grid.big .cell .lab { font-size:clamp(18px,4vmin,36px); }
+  .cell.empty { cursor:default; background:transparent; border:2px solid transparent; }
+  .cell.empty:active { transform:none; filter:none; }
+  .cell.empty.editing { border:2px dashed var(--emptyedit); cursor:pointer; }
   .cell.empty.editing::after { content:"+"; color:var(--emptyedit); font-size:22px; }
-  .cell .foldmark { position:absolute; top:4px; right:8px; font-size:11px; color:var(--accent); font-weight:800; }
-  .cell .editmark { position:absolute; top:4px; left:8px; font-size:11px; color:var(--muted); display:none; }
+  .cell.locked { opacity:.4; border-style:dashed; }
+  .cell .lvtag { position:absolute; top:3px; right:5px; font-size:10px; font-weight:700; color:#fff; background:#1F1A33; border-radius:5px; padding:0 4px; }
+  .cell .foldmark { display:none; }
+  .cell .editmark { position:absolute; top:3px; left:6px; font-size:11px; color:var(--muted); display:none; }
   body.editing .cell .editmark { display:block; }
   body.editing .cell { touch-action:none; }
   body.editing #gridwrap { touch-action:none; overscroll-behavior:contain; }
+  /* level picker (Settings) */
+  .lvpick { display:flex; flex-direction:column; gap:6px; }
+  .lvpick button { text-align:left; border:1px solid var(--border); background:var(--panel); color:var(--text); border-radius:12px; padding:10px 12px; cursor:pointer; font-family:inherit; display:flex; flex-direction:column; gap:2px; }
+  .lvpick button b { font-size:15px; }
+  .lvpick button span { font-size:13px; color:var(--muted); }
+  .lvpick button.on { border:2px solid var(--accent); background:var(--accsoft); }
 
   /* Bottom bar */
   #botbar { display:flex; align-items:center; gap:8px; padding:4px 14px 8px; background:transparent; }
-  #botbar button { border:none; background:var(--glass); border-radius:999px; padding:8px 16px; font-size:14px; font-weight:600; cursor:pointer; color:var(--text); box-shadow:var(--ambient); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
+  #botbar button { border:1px solid var(--border); background:var(--panel); border-radius:12px; padding:8px 16px; font-size:15px; font-weight:700; cursor:pointer; color:var(--text); font-family:inherit; }
   #edit.on { background:var(--accent); color:#fff; border-color:var(--accent); }
 
   /* Overlay / dialogs */
@@ -142,7 +153,7 @@
     width:100%; padding:10px; border:1px solid var(--border); border-radius:12px; font-size:16px; background:var(--panel); color:var(--text); }
   #ovbox input[type=range] { width:100%; accent-color:var(--accent); }
   .btnrow { display:flex; gap:8px; margin-top:14px; }
-  .btn { flex:1; border:none; border-radius:14px; padding:12px; font-size:15px; font-weight:600; cursor:pointer; background:var(--soft); color:var(--text); }
+  .btn { flex:1; border:none; border-radius:12px; padding:12px; font-size:15px; font-weight:700; cursor:pointer; background:var(--soft); color:var(--text); font-family:inherit; }
   .btn.primary { background:var(--accent); color:#fff; }
   .btn.danger { background:rgba(192,57,43,.12); color:var(--bad); }
   .btn.ghost { background:var(--panel); border:1px solid var(--border); }
@@ -159,20 +170,12 @@
   #guidebar { display:none; align-items:center; gap:10px; margin:0 10px 4px; padding:8px 14px; background:var(--tipbg); border:1px solid var(--tipborder); border-radius:14px; font-size:14px; font-weight:600; }
   #guidebar .gword { font-size:17px; font-weight:800; color:var(--accent); }
   #guidebar button { margin-left:auto; border:none; background:var(--glass); border-radius:999px; padding:6px 12px; font-weight:700; cursor:pointer; color:var(--text); }
-  .cell.guide-glow .pic { outline:3px solid var(--accent); animation:tbglow 1.1s ease-in-out infinite; }
+  .cell.guide-glow { outline:4px solid var(--accent); outline-offset:2px; animation:tbglow 1.1s ease-in-out infinite; }
   #homeBtn.guide-glow { outline:3px solid var(--accent); animation:tbglow 1.1s ease-in-out infinite; }
-  /* stories + game */
-  .sttile { display:flex; align-items:center; gap:6px; border:none; border-radius:14px; padding:8px 12px; font-size:16px; font-weight:600; cursor:pointer; color:var(--text); box-shadow:0 2px 0 var(--edge,transparent); }
-  .sttile.st-done { opacity:.4; }
-  .sttile.st-cur { outline:3px solid var(--accent); animation:tbglow 1.1s ease-in-out infinite; }
-  .sttile.st-next { opacity:.75; filter:grayscale(.6); }
   @keyframes tbglow {
     0%,100% { transform:scale(1); box-shadow:0 2px 0 var(--edge,transparent), 0 0 0 0 rgba(108,92,231,.45); }
     50%     { transform:scale(1.07); box-shadow:0 2px 0 var(--edge,transparent), 0 0 16px 5px rgba(108,92,231,.35); }
   }
-  .gtile { aspect-ratio:1; border:none; border-radius:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;
-    box-shadow:0 3px 0 var(--edge,transparent), var(--ambient); transition:transform .09s; }
-  .gtile:active { transform:translateY(2px); }
   #spkeys .spk2 { flex:1; max-width:44px; min-width:26px; padding:11px 0; font-size:17px; font-weight:700; border:1px solid var(--tipborder); border-radius:10px; background:var(--tipbg); color:var(--text); cursor:pointer; }
   #spkeys .spk2:active { filter:brightness(.9); }
   .pinpad { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
@@ -216,6 +219,7 @@
       </svg>
       <span>Kite</span>
     </div>
+    <span id="lvBadge">Level 2</span>
     <button id="homeBtn">⌂ Home</button>
     <button id="backBtn" style="display:none">‹ Back</button>
     <div id="crumb">Home</div>
@@ -229,7 +233,6 @@
   <div id="gridwrap"><div id="grid"></div></div>
   <div id="botbar">
     <button id="edit">🔒 Edit</button>
-    <button id="pbuild" style="display:none">🪄 Page builder</button>
     <div style="flex:1"></div>
     <span id="syncst" style="font-size:11px;color:var(--good);margin-right:8px"></span>
     <div style="font-size:11px;color:var(--muted)">Symbols © ARASAAC (CC BY-NC-SA), Gov. of Aragón</div>
@@ -254,7 +257,7 @@ window.onerror = function(msg, src, line){
 /* ============================================================
    KITE — single-file AAC app.  Section map (search these tags):
      [CONFIG]     Firebase config, device identity
-     [BOARDS]     starter board data, page builders
+     [BOARDS]     starter board data (Levels 1–3)
      [STATE]      board state, storage (localStorage + IndexedDB)
      [SPEECH]     TTS, recorded-audio playback
      [GRAMMAR]    suffix + irregular handling
@@ -262,8 +265,7 @@ window.onerror = function(msg, src, line){
      [KEYBOARD]   spell keyboard modes
      [EDIT]       button editor, drag-and-drop
      [SYMBOLS]    ARASAAC search + bulk
-     [PAGES]      page builder
-     [PRACTICE]   word finder
+          [PRACTICE]   word finder
      [REPORTS]    weekly / detailed / remote + shared UI
      [SETTINGS]   settings dialog
      [SYNC]       Firebase board sync, accounts
@@ -275,16 +277,16 @@ var ROWS = 7, COLS = 12;
 /* ---------- palette ---------- */
 /* [light bg, light border, dark bg, dark border] */
 var PAL = {
-  w:  ["#ffffff","#dcdff0","#262b38","#3d4456"],   /* default          */
-  y:  ["#ffec9c","#f2cf4e","#4d431d","#7a6a2c"],   /* pronouns yellow  */
-  g:  ["#c8f2b6","#8bda72","#26421d","#427037"],   /* verbs green      */
-  b:  ["#c9e5ff","#87c0f5","#20344c","#38587e"],   /* determiners blue */
-  o:  ["#ffd9a6","#f4ae57","#4a341a","#775530"],   /* orange           */
-  p:  ["#fcd0ec","#f095d2","#43253a","#6c3f5f"],   /* pink             */
-  pu: ["#e0d0ff","#b795f2","#352947","#554273"],   /* purple           */
-  t:  ["#bdeee6","#6fd6c4","#1e3d39","#33645b"],   /* teal             */
-  r:  ["#ffcfc2","#f39882","#47261c","#714035"],   /* red              */
-  gr: ["#e8ecf2","#c8d0dc","#2b303c","#414857"]    /* gray             */
+  w:  ["#FFFFFF","#A9A4BD","#262b38","#3d4456"],   /* little words      */
+  y:  ["#FFE58F","#C79C00","#4d431d","#7a6a2c"],   /* people / pronouns */
+  g:  ["#BDEBC5","#3E9B52","#26421d","#427037"],   /* action words      */
+  b:  ["#C6DDFF","#3B74D1","#20344c","#38587e"],   /* describing words  */
+  o:  ["#FFD6AD","#C96F1E","#4a341a","#775530"],   /* folders           */
+  p:  ["#FFD3E6","#C9437F","#43253a","#6c3f5f"],   /* social            */
+  pu: ["#E0D1FF","#7B52D6","#352947","#554273"],   /* questions         */
+  t:  ["#BDEEE6","#2E9C8A","#1e3d39","#33645b"],   /* go back           */
+  r:  ["#FFC9C3","#C1362B","#47261c","#714035"],   /* negation / stop   */
+  gr: ["#E4E2EC","#6E6A82","#2b303c","#414857"]    /* grammar, keyboard */
 };
 function palColors(key){
   var col = PAL[key] || PAL.w;
@@ -293,93 +295,87 @@ function palColors(key){
 }
 
 /* ---------- builders ---------- */
-function W(l,e,c,s){ return {t:"w", l:l, e:e||"⬜", c:c||"w", s:s||null, img:null}; }
-function F(l,e,tg,c,sp){ return {t:"f", l:l, e:e||"📁", c:c||"o", tg:tg, sp:(sp===true), img:null}; }
-function G(l,sfx,c){ return {t:"g", l:l, e:"🧩", c:c||"o", sfx:sfx, img:null}; }
-function CLEAR(){ return {t:"a", l:"CLEAR", e:"", c:"gr", a:"clear", img:null}; }
-function BACK(){ return {t:"a", l:"GO BACK", e:"⬅️", c:"t", a:"back", img:null}; }
-function SPELL(){ return {t:"a", l:"SPELL", e:"🔤", c:"g", a:"spell", img:null}; }
+/* lv = lowest board level a button appears at (2 or 3). Level 1 has its own 3x3 page. */
+function W(l,e,c,s,lv){ return {t:"w", l:l, e:e||"⬜", c:c||"w", s:s||null, img:null, lv:lv||3}; }
+function F(l,e,tg,c,lv){ return {t:"f", l:l, e:e||"📁", c:c||"o", tg:tg, sp:false, img:null, lv:lv||3}; }
+function G(l,sfx){ return {t:"g", l:l, e:"🧩", c:"gr", sfx:sfx, img:null, lv:3}; }
+function BACK(){ return {t:"a", l:"GO BACK", e:"⬅️", c:"t", a:"back", img:null, lv:2}; }
+function SPELL(){ return {t:"a", l:"ABC", e:"🔤", c:"gr", a:"spell", img:null, lv:3}; }
+/* level-2 word shorthand */
+function W2(l,e,c){ return W(l,e,c,null,2); }
 
-function rowsToCells(rows){
-  var cells = {};
+function pageDims(p){ return { c: (p && p.cols) || COLS, r: (p && p.rows) || ROWS }; }
+function rowsToCells(rows, cols){
+  var cells = {}, nc = cols || COLS;
   for (var r=0; r<rows.length; r++){
     for (var c=0; c<rows[r].length; c++){
-      if (rows[r][c]) cells[r*COLS+c] = rows[r][c];
+      if (rows[r][c]) cells[r*nc+c] = rows[r][c];
     }
   }
   return cells;
 }
 function page(name, rows){ return { name:name, cells: rowsToCells(rows) }; }
-function stubPage(name){
-  var rows = [[BACK()],[],[],[],[],[],[CLEAR()]];
-  return page(name, rows);
-}
+function stubPage(name){ return { name:name, cells: { 0: BACK() } }; }
 
-/* ---------- clean starter board (for sharing with other families) ---------- */
+/* ---------- starter board: one board, three levels ----------
+   Level 3 = everything. Level 2 = buttons tagged lv:2 (Universal Core 36 + yes/no + 6 folders).
+   Level 1 = its own big-button page ("l1"). Switching levels never deletes anything. */
 function starterBoard(){
-  var _ = null;
+  var P="y", V="g", D="b", L="w", Q="pu", S="p", N="r";
   var home = page("Home", [
-    [ W("I","🙋","y"), W("you","👉","y"), W("it","👇","y"), W("want","🤲","g"), W("go","🚦","g"), W("stop","🛑","r"), W("more","➕","b"), W("help","🛟","g"), W("like","👍","g"), W("not","🚫","r"), W("yes","✅","p"), W("no","👎","r") ],
-    [ W("we","👨‍👩‍👧","y"), W("he","👦","y"), W("she","👧","y"), W("they","👪","y"), W("get","🫴","g"), W("put","📥","g"), W("make","🔨","g"), W("do","⚙️","g"), W("have","🤝","g"), W("turn","🔄","g"), W("all done","🏁","b"), W("mine","🙋","y") ],
-    [ W("this","☝️","w"), W("that","👉","w"), W("look","👀","g"), W("come","🙋","g"), W("give","🎁","g"), W("open","📂","g"), W("eat","🍽️","g"), W("drink","🥤","g"), W("play","🎲","g"), W("see","👁️","g"), W("need","❗","g"), W("feel","💗","g") ],
-    [ W("a","🅰️","w"), W("the","📄","w"), W("some","✨","b"), W("big","🔵","b"), W("little","🔹","b"), W("good","😊","b"), W("bad","😞","b"), W("hot","🔥","b"), W("cold","❄️","b"), W("fast","💨","b"), W("here","📍","w"), W("there","📌","w") ],
-    [ W("and","🔗","w"), W("to","➡️","w"), W("in","📥","w"), W("on","🔛","w"), W("up","⬆️","w"), W("down","⬇️","w"), W("what","❓","pu"), W("where","📍","pu"), W("who","🧑","pu"), W("why","🤔","pu"), W("when","⏰","pu"), W("how","🔧","pu") ],
-    [ F("Food","🍎","s_food","o"), F("Drinks","🧃","s_drinks","o"), F("People","👪","s_people","o"), F("Feelings","🎭","s_feel","o"), F("Body","🧍","s_body","o"), F("Clothes","👕","s_clothes","o"), F("Places","🏠","s_places","o"), F("Play","🎲","s_play","o"), F("Animals","🐾","s_animals","o"), F("School","🏫","s_school","o"), F("Describing","🔵","s_desc","o"), F("More","➕","s_more","o") ],
-    [ CLEAR(), G("+s","s","g"), G("+ing","ing","g"), G("+ed","ed","g"), G("+er","er","b"), G("+est","est","b"), W("hi","👋","p"), W("bye","👋","p"), W("please","🙏","p"), W("thank you","🤗","p"), W("sorry","😔","p"), SPELL() ]
+    [ W2("I","🙋",P), W("me","👈",P), W2("want","🤲",V), W2("go","🚦",V), W2("stop","🛑",N), W2("help","🛟",V), W2("more","➕",D), W2("good","😊",D), W2("in","📥",L), W("out","📤",L), W2("what","❓",Q), W2("yes","✅",S) ],
+    [ W2("you","👉",P), W("my","🫵",P), W2("like","👍",V), W2("look","👀",V), W2("get","🫴",V), W2("put","📦",V), W2("all","💯",D), W("bad","😞",D), W2("on","🔛",L), W("off","📴",L), W2("where","📍",Q), W2("no","🙅",N) ],
+    [ W2("he","👦",P), W("your","🫴",P), W2("make","🔨",V), W2("do","⚙️",V), W2("turn","🔄",V), W2("open","📂",V), W2("some","✨",D), W("big","🐘",D), W2("up","⬆️",L), W("down","⬇️",L), W2("who","🧑",Q), W2("not","🚫",N) ],
+    [ W2("she","👧",P), W("they","👪",P), W2("can","💪",V), W("eat","🍽️",V), W("drink","🥤",V), W("play","🎲",V), W2("same","🟰",D), W("little","🐭",D), W2("here","📍",L), W("there","👉",L), W2("why","🤔",Q), W("hi","👋",S) ],
+    [ W2("it","👇",P), W("this","☝️",P), W("see","👁️",V), W("need","❗",V), W("have","🤝",V), W("come","🫳",V), W2("different","🔀",D), W("hot","🔥",D), W("to","➡️",L), W("with","🤝",L), W2("when","⏰",Q), W("bye","👋",S) ],
+    [ W("we","👨‍👩‍👧",P), W2("that","👉",P), W("give","🎁",V), W("feel","💗",V), W("know","💡",V), W("think","💭",V), W2("finished","🏁",D), W("cold","❄️",D), W("and","🔗",L), W("the","📄",L), W("how","🔧",Q), W("please","🙏",S) ],
+    [ F("People","👪","s_people","o",2), F("Food","🍎","s_food","o",2), F("Drinks","🧃","s_drinks","o",2), F("Feelings","🎭","s_feel","o",2), F("Places","🏠","s_places","o",2), F("Play","🧸","s_play","o",2),
+      F("Chat","💬","s_chat","o",3), F("More","🗂️","s_more","o",3), G("+s","s"), G("+ing","ing"), G("+ed","ed"), SPELL() ]
   ]);
-  function sp(name, items){
-    var rows = [[BACK()],[],[],[],[],[],[]];
-    var r=1, c=0;
-    for (var i=0;i<items.length;i++){
-      if (!rows[r]) rows[r]=[];
-      rows[r][c]=items[i];
-      c++; if (c>=COLS){ c=0; r++; if (r>5) break; }
+  /* folder page: GO BACK always at cell 0; first `l2` items show at Level 2, the rest at Level 3 */
+  function fp(name, items, l2){
+    var cells = { 0: BACK() };
+    for (var i=0; i<items.length && i < ROWS*COLS-1; i++){
+      var b = items[i];
+      b.lv = (i < l2) ? 2 : 3;
+      if (b.t === "f") b.lv = 3;
+      cells[i+1] = b;
     }
-    rows[6][COLS-1]=CLEAR();
-    return page(name, rows);
+    return { name:name, cells:cells };
   }
+  function w(l,e,c){ return W(l,e,c); }
   return {
-    version: 3, template: "starter", pin: "1234",
-    settings: { voice:"", rate:1.0, pitch:1.0, instant:true },
+    version: 4, template: "starter-levels", pin: "1234",
+    settings: { voice:"", rate:1.0, pitch:1.0, instant:true, level:2 },
     pages: {
       home: home,
-      s_food: sp("Food",[ W("apple","🍎"), W("banana","🍌"), W("cracker","🍘"), W("cheese","🧀"), W("bread","🍞"), W("cookie","🍪"), W("cereal","🥣"), W("yogurt","🥛"), W("chicken","🍗"), W("rice","🍚"), W("pasta","🍝"), W("egg","🥚"), W("fruit","🍓"), W("vegetable","🥦"), W("snack","🍿"), W("sandwich","🥪"), W("eat","🍽️","g"), W("want","🤲","g"), W("more","➕","b"), W("all done","🏁","b"), W("yummy","😋","b"), W("yucky","🤢","b"), W("hungry","😫","b") ]),
-      s_drinks: sp("Drinks",[ W("water","💧"), W("milk","🥛"), W("juice","🧃"), W("smoothie","🥤"), W("chocolate milk","🍫"), W("cup","☕"), W("bottle","🍼"), W("straw","🥤"), W("drink","🥛","g"), W("want","🤲","g"), W("more","➕","b"), W("thirsty","😛","b"), W("hot","🔥","b"), W("cold","❄️","b"), W("empty","🫗","b") ]),
-      s_people: sp("People",[ W("mom","👩"), W("dad","👨"), W("me","👈","y"), W("you","👉","y"), W("grandma","👵"), W("grandpa","👴"), W("sister","👧"), W("brother","👦"), W("baby","👶"), W("friend","🧑‍🤝‍🧑"), W("teacher","🧑‍🏫"), W("doctor","🧑‍⚕️"), W("nurse","👩‍⚕️"), W("family","👪"), W("love","❤️","g"), W("help","🛟","g"), W("where","📍","pu"), W("mine","🙋","y") ]),
-      s_feel: sp("Feelings",[ W("happy","😊"), W("sad","😢"), W("mad","😠"), W("scared","😱"), W("tired","🥱"), W("excited","🤩"), W("silly","🤪"), W("calm","😌"), W("love","❤️"), W("surprised","😮"), W("frustrated","😤"), W("bored","😑"), W("proud","🥲"), W("shy","🙈"), W("okay","👌"), W("feel","💗","g"), W("I","🙋","y"), W("very","⬆️","b"), W("a little","🤏","b") ]),
-      s_body: sp("Body",[ W("head","🧠"), W("hair","💇"), W("eyes","👀"), W("ears","👂"), W("nose","👃"), W("mouth","👄"), W("teeth","🦷"), W("hand","✋"), W("arm","💪"), W("leg","🦵"), W("foot","🦶"), W("tummy","🫃"), W("back","🔙"), W("throat","🗣️"), W("hurt","🤕","g"), W("itchy","😖","b"), W("sick","🤢","b"), W("better","😊","b"), W("where","📍","pu") ]),
-      s_clothes: sp("Clothes",[ W("shirt","👕"), W("pants","👖"), W("shoes","👟"), W("socks","🧦"), W("coat","🧥"), W("hat","🧢"), W("underwear","🩲"), W("pajamas","🩳"), W("dress","👗"), W("boots","🥾"), W("gloves","🧤"), W("diaper","🧷"), W("put on","👕","g"), W("take off","🙅","g"), W("wet","💧","b"), W("dry","☀️","b"), W("dirty","🟤","b"), W("warm","🌡️","b") ]),
-      s_places: sp("Places",[ W("home","🏠"), W("school","🏫"), W("store","🏪"), W("park","🌳"), W("bathroom","🚽"), W("kitchen","🍳"), W("bedroom","🛏️"), W("outside","🌳"), W("inside","🏠"), W("car","🚗"), W("doctor","🏥"), W("restaurant","🍴"), W("playground","🛝"), W("grandma's","👵"), W("go","🚦","g"), W("want","🤲","g"), W("here","📍","w"), W("where","📍","pu") ]),
-      s_play: sp("Play",[ W("ball","⚽"), W("blocks","🧱"), W("book","📖"), W("cars","🚗"), W("doll","🪆"), W("puzzle","🧩"), W("bubbles","🫧"), W("crayons","🖍️"), W("game","🎮"), W("music","🎵"), W("tablet","📱"), W("TV","📺"), W("swing","🛝"), W("slide","🛝"), W("bike","🚲"), W("play","🎲","g"), W("want","🤲","g"), W("my turn","🙋","y"), W("again","🔁","b"), W("fun","😄","b") ]),
-      s_animals: sp("Animals",[ W("dog","🐶"), W("cat","🐱"), W("fish","🐠"), W("bird","🐦"), W("cow","🐮"), W("horse","🐴"), W("pig","🐷"), W("duck","🦆"), W("bunny","🐰"), W("bear","🐻"), W("lion","🦁"), W("elephant","🐘"), W("monkey","🐵"), W("snake","🐍"), W("frog","🐸"), W("big","🔵","b"), W("little","🔹","b"), W("like","👍","g"), W("scared","😱","b") ]),
-      s_school: sp("School",[ W("teacher","🧑‍🏫"), W("friend","🧑‍🤝‍🧑"), W("book","📖"), W("pencil","✏️"), W("paper","📄"), W("table","🪑"), W("chair","🪑"), W("backpack","🎒"), W("crayon","🖍️"), W("glue","🧴"), W("scissors","✂️"), W("bus","🚌"), W("recess","🤸"), W("lunch","🍱"), W("help","🛟","g"), W("work","✍️","g"), W("play","🎲","g"), W("all done","🏁","b"), W("quiet","🤫","b"), W("line up","🚶","g") ]),
-      s_desc: sp("Describing",[ W("big","🔵","b"), W("little","🔹","b"), W("hot","🔥","b"), W("cold","❄️","b"), W("fast","💨","b"), W("slow","🐢","b"), W("loud","📢","b"), W("quiet","🤫","b"), W("clean","✨","b"), W("dirty","🟤","b"), W("wet","💧","b"), W("dry","☀️","b"), W("hard","🧱","b"), W("soft","🧸","b"), W("new","🆕","b"), W("old","📦","b"), W("funny","😂","b"), W("scary","😱","b"), W("yummy","😋","b"), W("yucky","🤢","b"), W("more","➕","b"), W("again","🔁","b") ]),
-      s_more: sp("More",[ F("Colors","🎨","s_colors","o"), F("Numbers","🔢","s_num","o"), F("Time","📅","s_time","o"), F("Weather","☀️","s_weather","o"), F("Go","🚗","s_go","o"), F("Actions","🏃","s_act","o"), F("Chat","💬","s_chat","o"), F("Events","🎉","s_events","o") ]),
-      s_colors: sp("Colors",[ W("red","🔴"), W("orange","🟠"), W("yellow","🟡"), W("green","🟢"), W("blue","🔵"), W("purple","🟣"), W("pink","🩷"), W("black","⚫"), W("white","⚪"), W("brown","🟤"), W("gray","🩶"), W("rainbow","🌈") ]),
-      s_num: sp("Numbers",[ W("one","1️⃣"), W("two","2️⃣"), W("three","3️⃣"), W("four","4️⃣"), W("five","5️⃣"), W("six","6️⃣"), W("seven","7️⃣"), W("eight","8️⃣"), W("nine","9️⃣"), W("ten","🔟"), W("zero","0️⃣"), W("none","🚫","b"), W("all","💯","b"), W("lots","📚","b"), W("more","➕","b"), W("count","🔢","g") ]),
-      s_time: sp("Time",[ W("today","📅"), W("tomorrow","➡️"), W("yesterday","⬅️"), W("morning","🌅"), W("day","☀️"), W("night","🌙"), W("now","⏰","b"), W("later","⏳","b"), W("soon","🔜","b"), W("wait","✋","g"), W("before","◀️","w"), W("after","▶️","w"), W("done","🏁","b") ]),
-      s_weather: sp("Weather",[ W("sunny","☀️"), W("rainy","🌧️"), W("cloudy","☁️"), W("snowy","❄️"), W("windy","💨"), W("hot","🔥","b"), W("cold","❄️","b"), W("storm","⛈️"), W("wet","💧","b"), W("rainbow","🌈") ]),
-      s_go: sp("Go",[ W("car","🚗"), W("bus","🚌"), W("train","🚂"), W("plane","✈️"), W("bike","🚲"), W("truck","🚚"), W("boat","⛵"), W("go","🚦","g"), W("ride","🛞","g"), W("fast","💨","b"), W("stop","🛑","r") ]),
-      s_act: sp("Actions",[ W("run","🏃","g"), W("jump","🤸","g"), W("walk","🚶","g"), W("sit","🪑","g"), W("stand","🧍","g"), W("sleep","😴","g"), W("wash","🧼","g"), W("brush","🪥","g"), W("throw","🤾","g"), W("catch","🧤","g"), W("push","👐","g"), W("pull","🫳","g"), W("dance","💃","g"), W("sing","🎤","g"), W("draw","✏️","g"), W("build","🧱","g"), W("clean up","🧹","g"), W("wait","✋","g"), W("hug","🤗","g"), W("kiss","😘","g") ]),
-      s_chat: sp("Chat",[ W("hi","👋","p"), W("bye","👋","p"), W("my name is","🏷️","p"), W("how are you","❓","p"), W("good","😊","b"), W("fine","👌","b"), W("guess what","💭","p"), W("I don't know","🤷","p"), W("thank you","🤗","p"), W("you're welcome","😊","p"), W("that's funny","😂","p"), W("cool","😎","b"), W("gross","🤢","b"), W("excuse me","🙋","p"), W("high five","🖐️","p") ]),
-      s_events: sp("Events",[ W("birthday","🎂"), W("party","🎉"), W("present","🎁"), W("cake","🍰"), W("vacation","🏖️"), W("trip","🧳"), W("holiday","🎊") ])
+      l1: { name:"Level 1", cols:3, rows:3, cells: {
+        0: W("swing","🎠","w",null,1), 1: W("slide","🛝","w",null,1), 2: W("ball","⚽","w",null,1),
+        3: W("go","🚦","g",null,1), 4: W("push","👐","g",null,1), 5: W("up","⬆️","w",null,1),
+        6: W("yes","✅","p",null,1), 7: W("more","➕","b",null,1), 8: W("no","🙅","r",null,1)
+      } },
+      s_people: fp("People",[ w("mom","👩"), w("dad","👨"), w("grandma","👵"), w("grandpa","👴"), w("sister","👧"), w("brother","👦"), w("baby","👶"), w("friend","🧑‍🤝‍🧑"), w("teacher","🧑‍🏫"), w("family","👪"), w("doctor","🧑‍⚕️"), w("nurse","👩‍⚕️"), w("love","❤️","g"), w("hug","🤗","g") ], 11),
+      s_food: fp("Food",[ w("apple","🍎"), w("banana","🍌"), w("cracker","🍘"), w("cheese","🧀"), w("bread","🍞"), w("cookie","🍪"), w("cereal","🥣"), w("yogurt","🥛"), w("chicken","🍗"), w("pasta","🍝"), w("snack","🍿"), w("rice","🍚"), w("egg","🥚"), w("fruit","🍓"), w("vegetable","🥦"), w("sandwich","🥪"), w("pizza","🍕"), w("hungry","😋","b"), w("yummy","😋","b"), w("yucky","🤢","b") ], 11),
+      s_drinks: fp("Drinks",[ w("water","💧"), w("milk","🥛"), w("juice","🧃"), w("smoothie","🥤"), w("chocolate milk","🍫"), w("cup","☕"), w("straw","🥤"), w("bottle","🍼"), w("thirsty","😛","b"), w("empty","🫗","b"), w("spill","💦","g") ], 11),
+      s_feel: fp("Feelings",[ w("happy","😊","b"), w("sad","😢","b"), w("mad","😠","b"), w("scared","😱","b"), w("tired","🥱","b"), w("excited","🤩","b"), w("silly","🤪","b"), w("calm","😌","b"), w("sick","🤢","b"), w("hurt","🤕","b"), w("okay","👌","b"), w("frustrated","😤","b"), w("bored","😑","b"), w("proud","🥲","b"), w("shy","🙈","b"), w("surprised","😮","b"), w("very","⬆️","b"), w("a little","🤏","b") ], 11),
+      s_places: fp("Places",[ w("home","🏠"), w("school","🏫"), w("outside","🌳"), w("park","🌳"), w("store","🏪"), w("car","🚗"), w("bathroom","🚽"), w("bedroom","🛏️"), w("kitchen","🍳"), w("playground","🛝"), w("grandma's","👵"), w("restaurant","🍴"), w("doctor's","🏥"), w("church","⛪"), w("pool","🏊"), w("inside","🏠") ], 11),
+      s_play: fp("Play",[ w("ball","⚽"), w("blocks","🧱"), w("book","📖"), w("bubbles","🫧"), w("music","🎵"), w("tablet","📱"), w("TV","📺"), w("swing","🎠"), w("slide","🛝"), w("puzzle","🧩"), w("cars","🚗"), w("crayons","🖍️"), w("doll","🪆"), w("game","🎮"), w("bike","🚲"), w("my turn","🙋","y"), w("your turn","👉","y"), w("again","🔁","b"), w("fun","🎉","b") ], 11),
+      s_chat: fp("Chat",[ w("thank you","🤗","p"), w("sorry","😔","p"), w("I don't know","🤷","p"), w("my name is","🏷️","p"), w("how are you","❓","p"), w("guess what","💭","p"), w("you're welcome","😊","p"), w("excuse me","🙋","p"), w("that's funny","😂","p"), w("cool","😎","b"), w("gross","🤢","b"), w("high five","🙌","p"), w("I love you","❤️","p"), w("wait","✋","g"), w("my turn","🙋","y") ], 0),
+      s_more: fp("More",[ F("Body","🧍","s_body"), F("Clothes","👕","s_clothes"), F("Animals","🐾","s_animals"), F("School","🏫","s_school"), F("Colors","🎨","s_colors"), F("Numbers","🔢","s_num"), F("Time","📅","s_time"), F("Weather","☀️","s_weather"), F("Travel","🚗","s_go"), F("Actions","🏃","s_act"), F("Events","🎉","s_events"), G("+er","er"), G("+est","est") ], 0),
+      s_body: fp("Body",[ w("head","🧠"), w("hair","💇"), w("eyes","👀"), w("ears","👂"), w("nose","👃"), w("mouth","👄"), w("teeth","🦷"), w("hand","✋"), w("arm","💪"), w("leg","🦵"), w("foot","🦶"), w("tummy","🫃"), w("back","🔙"), w("throat","🗣️"), w("itchy","😖","b"), w("better","😊","b") ], 0),
+      s_clothes: fp("Clothes",[ w("shirt","👕"), w("pants","👖"), w("shoes","👟"), w("socks","🧦"), w("coat","🧥"), w("hat","🧢"), w("pajamas","🩳"), w("dress","👗"), w("boots","🥾"), w("gloves","🧤"), w("underwear","🩲"), w("put on","👕","g"), w("take off","🙅","g"), w("wet","💧","b"), w("dry","☀️","b"), w("dirty","🟤","b") ], 0),
+      s_animals: fp("Animals",[ w("dog","🐶"), w("cat","🐱"), w("fish","🐠"), w("bird","🐦"), w("cow","🐮"), w("horse","🐴"), w("pig","🐷"), w("duck","🦆"), w("bunny","🐰"), w("bear","🐻"), w("lion","🦁"), w("elephant","🐘"), w("monkey","🐵"), w("snake","🐍"), w("frog","🐸") ], 0),
+      s_school: fp("School",[ w("book","📖"), w("pencil","✏️"), w("paper","📄"), w("backpack","🎒"), w("crayon","🖍️"), w("glue","🧴"), w("scissors","✂️"), w("bus","🚌"), w("recess","🤸"), w("lunch","🍱"), w("work","✍️","g"), w("read","📖","g"), w("write","✏️","g"), w("line up","🚶","g") ], 0),
+      s_colors: fp("Colors",[ w("red","🔴","b"), w("orange","🟠","b"), w("yellow","🟡","b"), w("green","🟢","b"), w("blue","🔵","b"), w("purple","🟣","b"), w("pink","🩷","b"), w("black","⚫","b"), w("white","⚪","b"), w("brown","🟤","b"), w("gray","🩶","b"), w("rainbow","🌈") ], 0),
+      s_num: fp("Numbers",[ w("one","1️⃣"), w("two","2️⃣"), w("three","3️⃣"), w("four","4️⃣"), w("five","5️⃣"), w("six","6️⃣"), w("seven","7️⃣"), w("eight","8️⃣"), w("nine","9️⃣"), w("ten","🔟"), w("zero","0️⃣"), w("lots","📚","b"), w("count","🔢","g") ], 0),
+      s_time: fp("Time",[ w("today","📅"), w("tomorrow","➡️"), w("yesterday","⬅️"), w("morning","🌅"), w("night","🌙"), w("now","⏰","b"), w("later","⏳","b"), w("soon","🔜","b"), w("wait","✋","g"), w("before","◀️"), w("after","▶️") ], 0),
+      s_weather: fp("Weather",[ w("sunny","☀️"), w("rainy","🌧️"), w("cloudy","☁️"), w("snowy","❄️"), w("windy","💨"), w("storm","⛈️"), w("rainbow","🌈"), w("wet","💧","b") ], 0),
+      s_go: fp("Travel",[ w("car","🚗"), w("bus","🚌"), w("train","🚂"), w("plane","✈️"), w("bike","🚲"), w("truck","🚚"), w("boat","⛵"), w("ride","🛞","g"), w("fast","💨","b"), w("slow","🐢","b") ], 0),
+      s_act: fp("Actions",[ w("run","🏃","g"), w("jump","🤸","g"), w("walk","🚶","g"), w("sit","🪑","g"), w("stand","🧍","g"), w("sleep","😴","g"), w("wash","🧼","g"), w("brush","🪥","g"), w("throw","🤾","g"), w("catch","🧤","g"), w("push","👐","g"), w("pull","🫳","g"), w("dance","💃","g"), w("sing","🎤","g"), w("draw","✏️","g"), w("build","🧱","g"), w("clean up","🧹","g"), w("read","📖","g"), w("watch","📺","g"), w("listen","👂","g") ], 0),
+      s_events: fp("Events",[ w("birthday","🎂"), w("party","🎉"), w("present","🎁"), w("cake","🍰"), w("vacation","🏖️"), w("trip","🧳"), w("holiday","🎊") ], 0)
     }
   };
 }
-
-/* ---------- topic word packs (offline page builder) ---------- */
-var TOPICS = {
-  "Dentist":  [["dentist","🦷"],["teeth","🦷"],["open","😮"],["brush","🪥"],["chair","🪑"],["rinse","💦"],["wait","⏳"],["all done","✔️"],["scared","😱"],["brave","💪"]],
-  "Beach":    [["beach","🏖️"],["sand","🏝️"],["water","💧"],["swim","🏊"],["sun","☀️"],["wave","🌊"],["bucket","🪣"],["sunscreen","🧴"],["hot","🥵"],["shells","🐚"]],
-  "Zoo":      [["zoo","🦁"],["lion","🦁"],["elephant","🐘"],["monkey","🐒"],["giraffe","🦒"],["bear","🐻"],["snake","🐍"],["bird","🐦"],["look","👀"],["feed","🍌"]],
-  "Birthday": [["birthday","🎂"],["cake","🎂"],["present","🎁"],["balloon","🎈"],["party","🥳"],["candles","🕯️"],["sing","🎵"],["friends","🧑‍🤝‍🧑"],["blow","💨"],["happy","😊"]],
-  "Doctor":   [["doctor","🩺"],["nurse","😷"],["medicine","💊"],["band-aid","🩹"],["hurt","🤕"],["better","😊"],["listen","👂"],["wait","⏳"],["brave","💪"],["sticker","⭐"]],
-  "School":   [["school","🏫"],["teacher","🧑‍🏫"],["backpack","🎒"],["lunch","🍱"],["recess","⚽"],["bus","🚌"],["friends","🧑‍🤝‍🧑"],["book","📖"],["write","✏️"],["line up","🚶"]],
-  "Park":     [["park","🌳"],["swing","🌀"],["slide","🛝"],["run","🏃"],["climb","🧗"],["grass","🌱"],["dog","🐕"],["ball","⚽"],["high","⬆️"],["again","🔄"]],
-  "Bath time":[["bath","🛁"],["bubbles","🫧"],["soap","🧼"],["wash","🧽"],["warm","♨️"],["duck","🦆"],["splash","💦"],["hair","💇"],["dry","🧻"],["clean","✨"]],
-  "Bedtime":  [["bed","🛏️"],["story","📖"],["blanket","🧸"],["pajamas","🌙"],["kiss","😘"],["hug","🤗"],["light off","💡"],["goodnight","🌙"],["dream","💭"],["tired","🥱"]],
-  "Car trip": [["car","🚗"],["seatbelt","🔐"],["music","🎵"],["window","🪟"],["snack","🍪"],["almost there","⏳"],["look","👀"],["stop","🛑"],["fast","💨"],["far","🗺️"]]
-};
 
 /* ---------- usage log ---------- */
 var LOG_KEY = "kite2_log";
@@ -389,7 +385,7 @@ function getLog(){
 function logWord(w){
   try {
     var lg = getLog();
-    lg.push({ w:w, t:Date.now() });
+    lg.push({ w:w, t:Date.now(), lv:lvl() });
     var cutoff = Date.now() - 60*864e5;              /* keep 60 days */
     if (lg.length > 8000 || lg[0] && lg[0].t < cutoff){
       lg = lg.filter(function(e){ return e.t >= cutoff; }).slice(-8000);
@@ -451,6 +447,8 @@ function ensureShape(){
   if (board.settings.volMin === undefined) board.settings.volMin = 0.15;
   if (!board.settings.kbLayout) board.settings.kbLayout = "qwerty";
   if (board.settings.motorReturn === undefined) board.settings.motorReturn = false;
+  if (!board.settings.level) board.settings.level = 2;
+  if (!board.pages.l1) board.pages.l1 = starterBoard().pages.l1;
   if (!board.fspFix){
     Object.keys(board.pages).forEach(function(pk){
       var cs = board.pages[pk].cells;
@@ -460,6 +458,28 @@ function ensureShape(){
   }
 }
 var cur = "home", stack = [], sent = [], editing = false, spellBuf = "";
+/* ---------- levels: one board, three views ---------- */
+function lvl(){ return (board && board.settings && board.settings.level) || 2; }
+function startPage(){ return lvl() === 1 ? "l1" : "home"; }
+/* a button shows when the board level is at or above its lv tag (untagged = Level 2) */
+function shown(b, pk){ return !b || pk === "l1" || (b.lv || 2) <= lvl(); }
+function setLevel(n){
+  if (n === lvl()) return;
+  board.settings.level = n;
+  if (!board.levelLog) board.levelLog = [];
+  board.levelLog.push({ lv: n, t: Date.now() });
+  save();
+  cur = startPage(); stack = [];
+  render();
+  toast("Level " + n + " — nothing was deleted. Switch back anytime in Settings.");
+}
+function updateLevelChrome(){
+  var l = lvl();
+  document.body.classList.toggle("lv1", l === 1);
+  document.getElementById("wfBtn").style.display = l >= 2 ? "" : "none";
+  var lb = document.getElementById("lvBadge");
+  if (lb) lb.textContent = "Level " + l;
+}
 
 /* ---------- speech ---------- */
 var SPELL_OK = { "TV":1, "OK":1, "DVD":1, "ABC":1 };   /* things that SHOULD be spelled out */
@@ -561,17 +581,21 @@ function picHTML(b, big){
 }
 /* ===== [RENDER] ===== */
 function render(){
+  updateLevelChrome();
+  if (lvl() === 1 && cur !== "l1"){ cur = "l1"; stack = []; }
+  if (lvl() !== 1 && cur === "l1"){ cur = "home"; stack = []; }
   var p = board.pages[cur];
-  if (!p){ cur = "home"; p = board.pages.home; }
-  document.getElementById("crumb").textContent = p.name;
+  if (!p){ cur = startPage(); p = board.pages[cur]; }
+  var dm = pageDims(p);
+  document.getElementById("crumb").textContent = (cur === "l1" || cur === "home") ? "Home" : p.name;
   document.getElementById("backBtn").style.display = stack.length ? "inline-block" : "none";
   document.getElementById("enote").style.display = editing ? "inline" : "none";
-  document.getElementById("pbuild").style.display = editing ? "inline-block" : "none";
   document.body.classList.toggle("editing", editing);
-  grid.style.gridTemplateColumns = "repeat("+COLS+",1fr)";
-  var sz = board.settings.size || "fit";
+  grid.style.gridTemplateColumns = "repeat("+dm.c+",1fr)";
+  grid.className = cur === "l1" ? "big" : "";
+  var sz = cur === "l1" ? "fit" : (board.settings.size || "fit");
   if (sz === "fit"){
-    grid.style.gridTemplateRows = "repeat("+ROWS+",1fr)";
+    grid.style.gridTemplateRows = "repeat("+dm.r+",1fr)";
     grid.style.gridAutoRows = "";
     grid.style.height = "100%";
     document.getElementById("gridwrap").style.overflowY = "hidden";
@@ -582,11 +606,23 @@ function render(){
     document.getElementById("gridwrap").style.overflowY = "auto";
   }
   grid.innerHTML = "";
-  for (var i=0; i<ROWS*COLS; i++){
+  for (var i=0; i<dm.r*dm.c; i++){
     (function(idx){
       var b = p.cells[idx];
       var d = document.createElement("div");
       d.dataset.idx = idx;
+      if (b && !shown(b, cur)){
+        /* locked at this level: an empty spot for the child, a faded reserved spot for an editing parent */
+        if (!editing){ d.className = "cell empty"; grid.appendChild(d); return; }
+        var lc = palColors(b.c);
+        d.className = "cell locked";
+        d.style.setProperty("--tile", lc[0]);
+        d.style.setProperty("--edge", lc[1]);
+        d.innerHTML = '<div class="pic">'+picHTML(b)+'</div><div class="lab">'+esc(b.l)+'</div><span class="lvtag">L'+(b.lv||2)+'</span>';
+        d.addEventListener(window.PointerEvent ? "pointerdown" : "touchstart", function(e){ dragStartCand(e, idx, d); });
+        d.addEventListener("click", function(){ if (suppressClick) return; openEditor(idx, b); });
+        grid.appendChild(d); return;
+      }
       if (!b){
         d.className = "cell empty" + (editing ? " editing" : "");
         if (editing) d.addEventListener("click", function(){ if (suppressClick) return; openEditor(idx, null); });
@@ -597,9 +633,9 @@ function render(){
       d.style.setProperty("--tile", col[0]);
       d.style.setProperty("--edge", col[1]);
       d.addEventListener(window.PointerEvent ? "pointerdown" : "touchstart", function(e){ dragStartCand(e, idx, d); });
+      d.className = "cell" + (b.t === "f" ? " folder" : "");
       d.innerHTML = '<div class="pic">'+picHTML(b)+'</div>' +
-        (b.l==="CLEAR" ? '<div class="lab" style="font-size:clamp(10px,1.9vmin,15px)">CLEAR</div>'
-                       : '<div class="lab">'+esc(b.l)+'</div>') +
+        '<div class="lab">'+esc(b.l)+'</div>' +
         (b.t==="f" ? '<span class="foldmark">▸</span>' : '') +
         '<span class="editmark">✎</span>';
       d.addEventListener("click", function(){ if (suppressClick) return; tapButton(idx, b); });
@@ -697,7 +733,7 @@ function tapButton(idx, b){
   pushWord(b);
   guideCheck(cur, idx);
   /* motor-plan: after choosing a word, return to the core/home page (LAMP / TD Snap style) */
-  if (board.settings.motorReturn && !guide && cur !== "home"){ cur = "home"; stack = []; render(); }
+  if (board.settings.motorReturn && !guide && cur !== startPage()){ cur = startPage(); stack = []; render(); }
 }
 function pushWord(b){
   var it = { l:b.l, say:(b.s || b.l), e:b.e, img:b.img, au:(b.au || null), c:(b.c || "w") };
@@ -707,7 +743,7 @@ function pushWord(b){
   if (board.settings.instant) playItems([it]);
 }
 function goBack(){
-  if (stack.length){ cur = stack.pop(); } else { cur = "home"; }
+  if (stack.length){ cur = stack.pop(); } else { cur = startPage(); }
   render();
 }
 function renderSent(){
@@ -734,7 +770,7 @@ document.getElementById("spk").addEventListener("click", function(){
 });
 document.getElementById("clr").addEventListener("click", function(){ sent=[]; renderSent(); });
 document.getElementById("bsp").addEventListener("click", function(){ sent.pop(); renderSent(); });
-document.getElementById("homeBtn").addEventListener("click", function(){ cur="home"; stack=[]; render(); });
+document.getElementById("homeBtn").addEventListener("click", function(){ cur=startPage(); stack=[]; render(); });
 document.getElementById("backBtn").addEventListener("click", goBack);
 
 /* ---------- overlay helpers ---------- */
@@ -961,6 +997,7 @@ document.getElementById("photoIn").addEventListener("change", function(){
 function openEditor(idx, b){
   var isNew = !b;
   var d = b ? JSON.parse(JSON.stringify(b)) : W("", "⬜");
+  var lvNow = b ? (b.lv || 2) : (lvl() === 3 ? 3 : 2);
   pendingImg = d.img || null;
   var pageOpts = Object.keys(board.pages).map(function(k){
     return '<option value="'+k+'"'+(d.t==="f" && d.tg===k ? " selected":"")+'>'+esc(board.pages[k].name)+'</option>';
@@ -970,10 +1007,16 @@ function openEditor(idx, b){
     '<p class="sub">Its spot on the grid stays fixed — that’s what protects motor memory.</p>' +
     '<label>Label</label><input type="text" id="el" value="'+esc(d.l||"")+'" placeholder="e.g. cookie">' +
     '<label>Speak as (optional)</label><input type="text" id="es2" value="'+esc(d.s||"")+'" placeholder="e.g. I’m hungry">' +
+    ((d.t === "w" || d.t === "f") ?
     '<label>Type</label><select id="et">' +
       '<option value="w"'+(d.t==="w"?" selected":"")+'>Word (speaks)</option>' +
       '<option value="f"'+(d.t==="f"?" selected":"")+'>Folder (opens a page)</option>' +
-    '</select>' +
+    '</select>' : '') +
+    (cur === "l1" ? '' :
+    '<label>Shows at</label><select id="elv">' +
+      '<option value="2"'+(lvNow===2?" selected":"")+'>Level 2 and 3</option>' +
+      '<option value="3"'+(lvNow===3?" selected":"")+'>Level 3 only</option></select>' +
+    '<div class="note">Hidden buttons keep their spot — moving up a level never shifts anything.</div>') +
     '<div id="folderRow" style="display:'+(d.t==="f"?"block":"none")+'">' +
       '<label>Opens page</label><select id="etg">'+pageOpts+'<option value="__new__">+ New page…</option></select>' +
       '<label style="display:flex;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="esp"'+(d.sp===true?" checked":"")+' style="width:auto"> Also speak the word when tapped</label>' +
@@ -1020,7 +1063,7 @@ function openEditor(idx, b){
     sws.appendChild(s);
   });
   /* type toggle */
-  ovbox.querySelector("#et").addEventListener("change", function(){
+  if (ovbox.querySelector("#et")) ovbox.querySelector("#et").addEventListener("change", function(){
     ovbox.querySelector("#folderRow").style.display = this.value==="f" ? "block" : "none";
   });
   /* tabs */
@@ -1117,7 +1160,8 @@ function openEditor(idx, b){
     if (!lab){ toast("Give the button a label."); return; }
     d.l = lab;
     d.s = ovbox.querySelector("#es2").value.trim() || null;
-    d.t = ovbox.querySelector("#et").value;
+    if (ovbox.querySelector("#et")) d.t = ovbox.querySelector("#et").value;
+    d.lv = cur === "l1" ? 1 : parseInt(ovbox.querySelector("#elv").value, 10);
     d.img = pendingImg;
     d.au = pendingAu;
     if (d.t === "f"){
@@ -1128,7 +1172,7 @@ function openEditor(idx, b){
       }
       d.tg = tg;
       d.sp = ovbox.querySelector("#esp").checked;
-    } else { delete d.tg; delete d.sp; delete d.a; delete d.sfx; }
+    } else if (d.t === "w"){ delete d.tg; delete d.sp; delete d.a; delete d.sfx; }
     board.pages[cur].cells[idx] = d;
     save(); closeOv(); render();
   });
@@ -1171,101 +1215,6 @@ function bulkSymbols(){
     });
   }
   step();
-}
-
-/* ---------- page builder ---------- */
-document.getElementById("pbuild").addEventListener("click", openBuilder);
-function firstEmpty(pageKey, fromIdx){
-  var cells = board.pages[pageKey].cells;
-  for (var i = (fromIdx || 0); i < ROWS*COLS; i++){ if (!cells[i]) return i; }
-  return -1;
-}
-function emptyCount(pk){ var c = board.pages[pk].cells, n = 0; for (var i = 0; i < ROWS*COLS; i++){ if (!c[i]) n++; } return n; }
-function makeSpillPage(fromKey){
-  var base = board.pages[fromKey].name.replace(/ \d+$/,"");
-  var pid = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-  board.pages[pid] = stubPage(base + " 2");
-  return pid;
-}
-/* ===== [PAGES] ===== */
-function openBuilder(){
-  var chips = Object.keys(TOPICS).map(function(k){
-    return '<button class="btn ghost tchip" data-t="'+esc(k)+'" style="flex:0 0 auto;padding:8px 12px;font-size:13px">'+esc(k)+'</button>';
-  }).join("");
-  var destOpts = Object.keys(board.pages).map(function(k){
-    return '<option value="'+k+'">Add to: '+esc(board.pages[k].name)+'</option>';
-  }).join("");
-  openOv('<h3>🪄 Page builder</h3><p class="sub">Pick a topic (or type your own words), then choose where the words go.</p>' +
-    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+chips+'</div>' +
-    '<label>Words to add (tap to keep/remove)</label><div id="wlist" style="display:flex;gap:6px;flex-wrap:wrap;min-height:34px"></div>' +
-    '<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="cw" placeholder="Add your own word…" style="flex:1"><button class="btn primary" id="cwa" style="flex:0 0 auto;padding:8px 14px">＋</button></div>' +
-    '<label>Where do they go?</label><select id="dest"><option value="__new__">A new page…</option>'+destOpts+'</select>' +
-    '<div id="newRows"><label>New page name</label><input type="text" id="npn" placeholder="e.g. Help with clothes">' +
-    '<label>Put the new page’s folder on…</label><select id="fparent">' +
-      Object.keys(board.pages).map(function(k){
-        return '<option value="'+k+'"'+(k===cur?" selected":"")+'>'+esc(board.pages[k].name)+'</option>';
-      }).join("") + '</select>' +
-    '<div class="note">Pages can live inside pages — e.g. put “Help with clothes” and “Help with food” folders on a “Help” page.</div></div>' +
-    '<div class="btnrow"><button class="btn" id="bc">Cancel</button><button class="btn primary" id="bgo">Add words</button></div>' +
-    '<div class="note">Words fill empty slots only — existing buttons never move. Then run Settings → “Get real symbols” to picture them all.</div>');
-  var picked = [];   /* [{w,e,on}] */
-  function renderW(){
-    var el = ovbox.querySelector("#wlist"); el.innerHTML = "";
-    picked.forEach(function(p, i){
-      var bt = document.createElement("button");
-      bt.className = "btn ghost";
-      bt.style.cssText = "flex:0 0 auto;padding:7px 10px;font-size:13px" + (p.on ? "" : ";opacity:.35;text-decoration:line-through");
-      bt.textContent = p.e + " " + p.w;
-      bt.addEventListener("click", function(){ p.on = !p.on; renderW(); });
-      el.appendChild(bt);
-    });
-  }
-  Array.prototype.forEach.call(ovbox.querySelectorAll(".tchip"), function(ch){
-    ch.addEventListener("click", function(){
-      var t = ch.getAttribute("data-t");
-      picked = TOPICS[t].map(function(pr){ return { w:pr[0], e:pr[1], on:true }; });
-      ovbox.querySelector("#npn").value = t;
-      renderW();
-    });
-  });
-  ovbox.querySelector("#cwa").addEventListener("click", function(){
-    var v = ovbox.querySelector("#cw").value.trim();
-    if (v){ picked.push({ w:v, e:"⬜", on:true }); ovbox.querySelector("#cw").value = ""; renderW(); }
-  });
-  ovbox.querySelector("#dest").addEventListener("change", function(){
-    ovbox.querySelector("#newRows").style.display = this.value === "__new__" ? "block" : "none";
-  });
-  ovbox.querySelector("#bc").addEventListener("click", closeOv);
-  ovbox.querySelector("#bgo").addEventListener("click", function(){
-    var words = picked.filter(function(p){ return p.on; });
-    if (!words.length){ toast("Pick a topic or add some words first."); return; }
-    var dest = ovbox.querySelector("#dest").value;
-    if (dest === "__new__"){
-      var name = ovbox.querySelector("#npn").value.trim() || "New page";
-      var parent = ovbox.querySelector("#fparent").value;
-      var slot = firstEmpty(parent, 0);
-      if (slot < 0){ toast("No empty spot on “"+board.pages[parent].name+"” for the folder — pick another page."); return; }
-      var pid = "p" + Date.now();
-      board.pages[pid] = stubPage(name);
-      board.pages[parent].cells[slot] = F(name, "🗂️", pid, "o", false);
-      dest = pid;
-    }
-    var added = 0, curDest = dest, wi = 0, spilled = false;
-    while (wi < words.length){
-      var empties = emptyCount(curDest);
-      if (empties === 0){ curDest = makeSpillPage(curDest); spilled = true; continue; }
-      if (empties === 1 && (words.length - wi) > 1){
-        var li = firstEmpty(curDest, 0), np = makeSpillPage(curDest);
-        board.pages[curDest].cells[li] = F(board.pages[curDest].name + " ▸", "➡️", np, "o", false);
-        curDest = np; spilled = true; continue;
-      }
-      var idx = firstEmpty(curDest, 0);
-      board.pages[curDest].cells[idx] = W(words[wi].w, words[wi].e);
-      added++; wi++;
-    }
-    save(); render(); closeOv();
-    toast(added + " words added" + (spilled ? " — a new page was created for the overflow" : " to “" + board.pages[dest].name + "”") + ". Get symbols in Settings.");
-  });
 }
 
 /* ---------- device identity (never synced) ---------- */
@@ -1311,7 +1260,7 @@ function genId(p){ return p + Date.now().toString(36) + Math.random().toString(3
 /* ---------- firebase sync ---------- */
 var db = null, syncOn = false, unsubBoard = null, pushTimer = null, applyingRemote = false;
 var pushedIds = {};
-try { pushedIds = JSON.parse(localStorage.getItem("tb_pushed")) || {}; } catch(e){}
+try { pushedIds = JSON.parse(localStorage.getItem("kite2_pushed")) || {}; } catch(e){}
 function setStatus(msg){
   var el = document.getElementById("syncst");
   if (el) el.textContent = msg;
@@ -1512,7 +1461,7 @@ function pushBoard(){
     db.collection("families").doc(dev.code).collection("media").doc(id).set({ d: sm.media[id] })
       .then(function(){
         pushedIds[id] = 1;
-        try { localStorage.setItem("tb_pushed", JSON.stringify(pushedIds)); } catch(e){}
+        try { localStorage.setItem("kite2_pushed", JSON.stringify(pushedIds)); } catch(e){}
         step();
       }).catch(step);
   }
@@ -1558,7 +1507,7 @@ function flushUsage(){
   keys.forEach(function(k){ upd["counts."+k] = firebase.firestore.FieldValue.increment(usageBuf[k]); });
   usageBuf = {};
   var ref = db.collection("families").doc(dev.code).collection("usage").doc(dev.id+"_"+day);
-  ref.set({ d: day }, { merge: true }).then(function(){ return ref.update(upd); }).catch(function(){});
+  ref.set({ d: day, lv: lvl() }, { merge: true }).then(function(){ return ref.update(upd); }).catch(function(){});
 }
 function newFamilyCode(){
   var a = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", c = "";
@@ -1866,7 +1815,7 @@ function wordIndex(){
     var cs = board.pages[pk].cells;
     Object.keys(cs).forEach(function(ci){
       var b = cs[ci];
-      if (b && b.t === "w"){
+      if (b && b.t === "w" && pk !== "l1" && shown(b, pk)){
         var k = b.l.toLowerCase();
         if (!ix[k]) ix[k] = b;
       }
@@ -1885,6 +1834,7 @@ function bfsPath(wordKey){
     var ci, b;
     for (ci in cells){
       b = cells[ci];
+      if (!shown(b, p)) continue;
       if (b.t === "w" && b.l.toLowerCase() === wordKey){
         var steps = [{ page: p, idx: parseInt(ci,10) }];
         var node = p;
@@ -1894,7 +1844,7 @@ function bfsPath(wordKey){
     }
     for (ci in cells){
       b = cells[ci];
-      if (b.t === "f" && board.pages[b.tg] && !(b.tg in prev)){
+      if (b.t === "f" && shown(b, p) && board.pages[b.tg] && !(b.tg in prev)){
         prev[b.tg] = { page: p, idx: parseInt(ci,10) };
         q.push(b.tg);
       }
@@ -1995,7 +1945,7 @@ function openWordFinder(){
       bt.addEventListener("click", function(){ closeOv(); startWordGuide(b.l); });
       res.appendChild(bt);
     });
-    if (!list.length) res.innerHTML = '<div class="note">That word isn’t on the board yet — add it in Edit mode or the Page builder.</div>';
+    if (!list.length) res.innerHTML = '<div class="note">That word isn’t on the board yet — add it in Edit mode.</div>';
   }
   show(all);
   ovbox.querySelector("#wfq").addEventListener("input", function(){
@@ -2048,10 +1998,11 @@ function printBoard(){
   Object.keys(board.pages).forEach(function(pk){
     var p = board.pages[pk];
     out += '<div class="pg"><h2>' + esc(p.name) + '</h2><table>';
-    for (var r = 0; r < ROWS; r++){
+    var dm = pageDims(p);
+    for (var r = 0; r < dm.r; r++){
       out += '<tr>';
-      for (var c = 0; c < COLS; c++){
-        var b = p.cells[r*COLS + c];
+      for (var c = 0; c < dm.c; c++){
+        var b = p.cells[r*dm.c + c];
         if (b){
           var pic = (b.img && b.img.d) ? '<img src="' + b.img.d + '">' : '<div class="em">' + (b.e || "") + '</div>';
           out += '<td>' + pic + esc(b.l) + '</td>';
@@ -2080,6 +2031,14 @@ function openSettings(){
     vopts += '<option value="'+esc(v.name)+'"'+(board.settings.voice===v.name?" selected":"")+'>'+esc(v.name)+' ('+esc(v.lang)+')</option>';
   });
   openOv('<h3>Settings</h3>' +
+    '<label style="margin-top:0">Board level</label>' +
+    '<div class="lvpick" id="lvpick">' +
+      [1,2,3].map(function(n){
+        var t = ["","Starter","Building","Full board"][n], dsc = ["","9 big buttons · lesson words","Core words + 6 folders · Word Finder","Everything · keyboard + grammar"][n];
+        return '<button data-lv="'+n+'" class="'+(lvl()===n?"on":"")+'"><b>Level '+n+' · '+t+'</b><span>'+dsc+'</span></button>';
+      }).join("") +
+    '</div>' +
+    '<div class="note">Levels show more or less of the same board. Switching never deletes or moves anything. Set on each device — the parent phone can stay on Level 3 for editing.</div>' +
     '<button class="btn ghost" id="rep" style="width:100%;margin-top:6px">📊 Weekly report &amp; target words</button>' +
     '<button class="btn ghost" id="syncb" style="width:100%;margin-top:6px">☁ Phone sync '+(syncOn ? "· connected ✓" : "· set up")+'</button>' +
     '<label>Voice</label><select id="vv">'+vopts+'</select>' +
@@ -2114,6 +2073,9 @@ function openSettings(){
     '<div class="btnrow"><button class="btn ghost" id="pinc">Change PIN</button><button class="btn ghost" id="rst">Reset board…</button></div>' +
     '<div class="note" style="text-align:center;margin-top:10px"><a href="privacy.html" target="_blank" style="color:var(--muted)">Privacy &amp; data policy</a></div>' +
     '<div class="btnrow"><button class="btn primary" id="sd">Done</button></div>');
+  Array.prototype.forEach.call(ovbox.querySelectorAll("#lvpick button"), function(bt){
+    bt.addEventListener("click", function(){ setLevel(parseInt(bt.getAttribute("data-lv"),10)); openSettings(); });
+  });
   ovbox.querySelector("#rep").addEventListener("click", openReport);
   ovbox.querySelector("#syncb").addEventListener("click", openSyncDlg);
   ovbox.querySelector("#vv").addEventListener("change", function(){ board.settings.voice = this.value; save(); });
@@ -2182,6 +2144,7 @@ function startApp(){
   applyTheme();
   load();
   ensureShape();
+  cur = startPage();
   renderSent();
   render();
   if (dev.fb && dev.code){

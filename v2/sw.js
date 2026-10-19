@@ -1,5 +1,5 @@
 /* Kite service worker — the app works with zero internet after first visit */
-var CACHE = "kite2-v1";
+var CACHE = "kite2-v2";
 self.addEventListener("install", function(e){
   e.waitUntil(
     caches.open(CACHE).then(function(c){ return c.addAll(["./", "./index.html"]); })
@@ -32,8 +32,8 @@ self.addEventListener("fetch", function(e){
     );
     return;
   }
-  /* ARASAAC symbols: cache once seen, so symbols survive offline */
-  if (url.hostname === "static.arasaac.org"){
+  /* ARASAAC symbols + the Atkinson Hyperlegible font: cache once seen, so they survive offline */
+  if (url.hostname === "static.arasaac.org" || url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com"){
     e.respondWith(
       caches.match(e.request).then(function(cached){
         return cached || fetch(e.request).then(function(resp){
