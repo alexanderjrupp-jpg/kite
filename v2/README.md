@@ -16,5 +16,6 @@ Working copy of Kite for the tiered-board rebuild (Levels 1–3). The original a
 
 ## Deploy
 
-- **Vercel:** project imported from this repo with Root Directory = `v2`. No build step, no framework preset.
-- **GitHub Pages:** also reachable at `/kite/v2/`, because Pages publishes the whole repo. Use the Vercel link for testing.
+Live at **https://alexanderjrupp-jpg.github.io/kite/v2/**. GitHub Pages publishes from `main`, so pushing changes to `v2/` updates it.
+
+v1 and v2 share the same web address (origin), so v2's service worker only ever clears its own `kite2-` caches, never v1's.
