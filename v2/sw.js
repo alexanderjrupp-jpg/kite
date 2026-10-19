@@ -1,5 +1,5 @@
 /* Kite service worker — the app works with zero internet after first visit */
-var CACHE = "kite2-v2";
+var CACHE = "kite2-v3";
 self.addEventListener("install", function(e){
   e.waitUntil(
     caches.open(CACHE).then(function(c){ return c.addAll(["./", "./index.html"]); })
@@ -37,7 +37,7 @@ self.addEventListener("fetch", function(e){
     e.respondWith(
       caches.match(e.request).then(function(cached){
         return cached || fetch(e.request).then(function(resp){
-          if (resp && resp.ok){
+          if (resp && (resp.ok || resp.type === "opaque")){
             var copy = resp.clone();
             caches.open(CACHE).then(function(c){ c.put(e.request, copy); });
           }

@@ -20,7 +20,13 @@ Games (Find It), Stories & Songs, Model With Me routines, daily parent tips and 
 
 Also removed: the page builder (custom pages are made with normal edit mode: add a folder, pick "+ New page").
 
-Kept: board, speech, grammar, keyboard, editing, symbols, Word Finder (and its guided path), analytics/target words, sync and accounts, volume limits, print and export/import.
+Analytics is paused for the MVP: no usage log on the device and no usage uploads to the cloud. It comes back once there's a reliable way to tell the child's own taps from adults modeling.
+
+Kept: board, speech, grammar, keyboard, editing, Word Finder (and its guided path), sync and accounts, volume limits, print and export/import.
+
+## Symbols
+
+ARASAAC symbols are built in: on first launch (and after a reset or import) the device looks up every word and folder that has no picture and uses the top match, preferring an exact keyword match. This runs in the background with no download step; emoji show until each symbol arrives. New buttons get a symbol automatically when saved without a picture. Symbols are stored as URLs and the service worker keeps a copy of each image for offline use. Any symbol can be swapped in edit mode.
 
 ## Levels
 
@@ -30,7 +36,7 @@ One board, three views. Set in Settings (behind the PIN), per device.
 - **Level 2 · Building** — the 12x7 home board showing only buttons tagged `lv: 2`: the Universal Core 36, yes/no and six folders. Word Finder on.
 - **Level 3 · Full board** — every button, including Chat, More, grammar endings and the keyboard.
 
-Every button carries `lv` (lowest level it appears at). Hidden buttons keep their cell, so nothing moves between Levels 2 and 3, and switching never deletes anything. In edit mode, hidden buttons show faded with an L3 tag; the editor's "Shows at" field changes it. Each logged word records the level it was said at (`lv`), and level changes are kept in `board.levelLog`, so reports can tell a bigger board apart from language growth.
+Every button carries `lv` (lowest level it appears at). Hidden buttons keep their cell, so nothing moves between Levels 2 and 3, and switching never deletes anything. In edit mode, hidden buttons show faded with an L3 tag; the editor's "Shows at" field changes it. Level changes are kept in `board.levelLog` for when analytics returns.
 
 ## Deploy
 

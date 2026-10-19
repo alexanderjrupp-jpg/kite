@@ -377,26 +377,6 @@ function starterBoard(){
   };
 }
 
-/* ---------- usage log ---------- */
-var LOG_KEY = "kite2_log";
-function getLog(){
-  try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch(e){ return []; }
-}
-function logWord(w){
-  try {
-    var lg = getLog();
-    lg.push({ w:w, t:Date.now(), lv:lvl() });
-    var cutoff = Date.now() - 60*864e5;              /* keep 60 days */
-    if (lg.length > 8000 || lg[0] && lg[0].t < cutoff){
-      lg = lg.filter(function(e){ return e.t >= cutoff; }).slice(-8000);
-    }
-    var lj = JSON.stringify(lg);
-    localStorage.setItem(LOG_KEY, lj);
-    idbSet(LOG_KEY, lj);
-  } catch(e){}
-  queueUsage(w);
-}
-
 /* ---------- durable storage mirror (IndexedDB survives iOS cache cleanups) ---------- */
 var idb = null;
 function idbOpen(cb){
@@ -719,7 +699,6 @@ function tapButton(idx, b){
     var neu = applySuffix(last.say, b.sfx.replace(/^\+/,""));
     last.say = neu; last.l = neu; last.au = null;
     renderSent();
-    logWord(neu);
     if (board.settings.instant) speak(neu);
     return;
   }
@@ -739,7 +718,6 @@ function pushWord(b){
   var it = { l:b.l, say:(b.s || b.l), e:b.e, img:b.img, au:(b.au || null), c:(b.c || "w") };
   sent.push(it);
   renderSent();
-  logWord(it.say);
   if (board.settings.instant) playItems([it]);
 }
 function goBack(){
@@ -891,7 +869,6 @@ function drawSpell(){
     if (t){
       sent.push({ l:t, say:t, e:"🔤", img:null, c:"w" });
       renderSent();
-      logWord(t);
       if (board.settings.instant) speak(t);
     }
     closeOv();
@@ -907,8 +884,7 @@ editBtn.addEventListener("click", function(){
   function unlock(){
     endGuide();
     editing = true; editBtn.className="on"; editBtn.innerHTML = "✓ Done"; render();
-    if (!board.settings.symbolsNudged && navigator.onLine){
-      board.settings.symbolsNudged = true; save();
+    if (false){
       openOv('<h3>🖼️ Use real AAC symbols?</h3><p class="sub">Therapists recommend real communication symbols over emoji. Kite can fetch a matching ARASAAC symbol for every button — one time, needs internet, then works offline.</p>' +
         '<div class="btnrow"><button class="btn" id="nsl">Later</button><button class="btn primary" id="nsy">Get symbols</button></div>');
       ovbox.querySelector("#nsl").addEventListener("click", closeOv);
@@ -947,7 +923,14 @@ function arasaacSearch(q, cb){
   var url = "https://api.arasaac.org/api/pictograms/en/search/" + encodeURIComponent(q);
   fetch(url).then(function(r){ return r.ok ? r.json() : []; }).then(function(list){
     list = (list || []).slice();
-    list.sort(function(a,b2){ return (b2.aac?2:0)+(b2.aacColor?1:0) - ((a.aac?2:0)+(a.aacColor?1:0)); });
+    var ql = String(q).toLowerCase().trim();
+    function score(it){
+      var exact = (it.keywords || []).some(function(k){ return String(k.keyword || "").toLowerCase().trim() === ql; });
+      return (exact ? 4 : 0) + (it.aac ? 2 : 0) + (it.aacColor ? 1 : 0);
+    }
+    list = list.map(function(it, i){ return { it: it, i: i, s: score(it) }; })
+      .sort(function(a, b2){ return (b2.s - a.s) || (a.i - b2.i); })
+      .map(function(x){ return x.it; });
     cb(list.slice(0, 16).map(function(it){
       return "https://static.arasaac.org/pictograms/" + it._id + "/" + it._id + "_300.png";
     }));
@@ -1175,10 +1158,60 @@ function openEditor(idx, b){
     } else if (d.t === "w"){ delete d.tg; delete d.sp; delete d.a; delete d.sfx; }
     board.pages[cur].cells[idx] = d;
     save(); closeOv(); render();
+    var needsPic = (d.t === "w" || d.t === "f") && !d.img && (!d.e || d.e === "⬜");
+    if (needsPic && navigator.onLine){
+      var target = d, pk = cur;
+      arasaacSearch(lab, function(urls){
+        if (urls && urls.length && !target.img && board.pages[pk] && board.pages[pk].cells[idx] === target){
+          target.img = { u: urls[0] }; warmSymbol(urls[0]); save(); render();
+        }
+      });
+    }
   });
 }
 
 /* ---------- bulk symbol download ---------- */
+/* ---------- built-in symbols: the device fills in ARASAAC symbols by itself ----------
+   First launch (and after a reset), every word or folder without a picture gets the top
+   ARASAAC match in the background. Symbols are stored as URLs (small, sync-friendly) and
+   the service worker keeps a copy of each image so they work offline. */
+var autoSymRunning = false;
+function autoSymbols(){
+  if (autoSymRunning || !board || board.symAuto) return;
+  if (!navigator.onLine){ window.addEventListener("online", autoSymbols, { once:true }); return; }
+  var queue = [];
+  Object.keys(board.pages).forEach(function(pk){
+    var cells = board.pages[pk].cells;
+    Object.keys(cells).forEach(function(ci){
+      var b = cells[ci];
+      if (b && (b.t === "w" || b.t === "f") && !b.img) queue.push(b);
+    });
+  });
+  if (!queue.length){ board.symAuto = true; save(); return; }
+  autoSymRunning = true;
+  var i = 0, sinceRender = 0, fails = 0;
+  function step(){
+    if (i >= queue.length || fails > 12){
+      autoSymRunning = false;
+      if (fails <= 12) board.symAuto = true;
+      save(); render(); return;
+    }
+    var b = queue[i++];
+    if (b.img){ setTimeout(step, 0); return; }             /* someone picked one meanwhile */
+    arasaacSearch(b.l, function(urls){
+      if (urls === null) fails++;
+      if (urls && urls.length && !b.img){
+        b.img = { u: urls[0] };
+        warmSymbol(urls[0]);
+        if (++sinceRender >= 12){ sinceRender = 0; save(); render(); }
+      }
+      setTimeout(step, 60);
+    });
+  }
+  step();
+}
+/* fetch once with CORS so the service worker stores a real (non-opaque) copy for offline use */
+function warmSymbol(u){ try { fetch(u, { mode:"cors" }).catch(function(){}); } catch(e){} }
 function bulkSymbols(){
   var queue = [];
   Object.keys(board.pages).forEach(function(pk){
@@ -1489,26 +1522,6 @@ function startListen(){
     } catch(e){ applyingRemote = false; }
   }, function(){ setStatus("Sync offline — device still works"); });
 }
-/* usage upload so the parent phone can see the report remotely */
-var usageBuf = {}, usageTimer = null;
-function queueUsage(w){
-  if (!syncOn) return;
-  var k = safeKey(w.toLowerCase());
-  usageBuf[k] = (usageBuf[k] || 0) + 1;
-  clearTimeout(usageTimer);
-  usageTimer = setTimeout(flushUsage, 8000);
-}
-function flushUsage(){
-  if (!syncOn || !db) return;
-  var keys = Object.keys(usageBuf);
-  if (!keys.length) return;
-  var day = dkey(new Date());
-  var upd = {};
-  keys.forEach(function(k){ upd["counts."+k] = firebase.firestore.FieldValue.increment(usageBuf[k]); });
-  usageBuf = {};
-  var ref = db.collection("families").doc(dev.code).collection("usage").doc(dev.id+"_"+day);
-  ref.set({ d: day, lv: lvl() }, { merge: true }).then(function(){ return ref.update(upd); }).catch(function(){});
-}
 function newFamilyCode(){
   var a = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", c = "";
   for (var i=0;i<8;i++) c += a[Math.floor(Math.random()*a.length)];
@@ -1623,189 +1636,6 @@ function openAccountDlg(mode){
     ovbox.querySelector("#acMsg").textContent = "Opening Google…";
     signInGoogle(function(err){ if (err){ ovbox.querySelector("#acMsg").textContent = err; return; } toast("Signed in with Google ✓"); openSyncDlg(); });
   });
-}
-
-/* remote report: parent phone reads what the child device uploaded */
-/* ===== SHARED REPORT UI (used by weekly / detailed / remote reports) ===== */
-function rptStat(n, label){
-  return '<div style="flex:1;background:var(--soft);border-radius:12px;padding:9px;text-align:center"><div style="font-size:21px;font-weight:800;color:var(--accent)">'+n+'</div><div style="font-size:11px;color:var(--muted)">'+label+'</div></div>';
-}
-function rptTopWords(counts, limit, emptyMsg){
-  var top = Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; }).slice(0, limit);
-  if (!top.length) return '<div class="note">'+emptyMsg+'</div>';
-  var maxN = counts[top[0]] || 1;
-  return top.map(function(w){
-    return '<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><div style="width:90px;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(w)+'</div>' +
-      '<div style="flex:1;height:13px;background:var(--soft);border-radius:99px"><div style="height:13px;border-radius:99px;background:var(--accent);width:'+Math.max(5, Math.round(counts[w]/maxN*100))+'%"></div></div>' +
-      '<div style="width:34px;text-align:right;font-size:13px">'+counts[w]+'</div></div>';
-  }).join("");
-}
-function rptDayBars(items){
-  var maxD = 1;
-  items.forEach(function(it){ if (it.n > maxD) maxD = it.n; });
-  return items.map(function(dc){
-    return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:70%;background:var(--accent);border-radius:4px 4px 0 0;height:'+Math.round(dc.n/maxD*54)+'px"></div><div style="font-size:11px;color:var(--muted)">'+dc.lb+'</div></div>';
-  }).join("");
-}
-function rptTargets(cThis, cLast, keyFn){
-  keyFn = keyFn || function(w){ return w.toLowerCase(); };
-  return board.targets.map(function(tw, i){
-    var a = cThis[keyFn(tw)]||0, b = cLast[keyFn(tw)]||0;
-    var trend = a > b ? "↑" : (a < b ? "↓" : "→");
-    var col = a > b ? "var(--good)" : (a < b ? "var(--bad)" : "var(--muted)");
-    return '<div style="display:flex;align-items:center;gap:8px;margin:5px 0;padding:8px 10px;background:var(--soft);border-radius:10px">' +
-      '<div style="flex:1;font-weight:600">'+esc(tw)+'</div><div style="font-size:13px">'+a+' this wk · '+b+' last wk</div>' +
-      '<div style="font-weight:700;color:'+col+'">'+trend+'</div><button class="btn ghost tdel" data-i="'+i+'" style="flex:0 0 auto;padding:4px 10px">✕</button></div>';
-  }).join("") || '<div class="note">No target words yet — add words you and his SLP are working on.</div>';
-}
-
-function remoteReport(){
-  openOv('<h3>📊 Weekly report</h3><p class="sub">Loading from your family…</p>');
-  var cutoff = dkey(new Date(Date.now() - 14*864e5));
-  var wkAgo = dkey(new Date(Date.now() - 7*864e5));
-  db.collection("families").doc(dev.code).collection("usage").where("d", ">=", cutoff).get().then(function(q){
-    var cT = {}, cL = {}, dayTot = {}, totT = 0, totL = 0;
-    q.forEach(function(ds){
-      var d = ds.data(), counts = d.counts || {};
-      var isThis = d.d > wkAgo;
-      Object.keys(counts).forEach(function(w){
-        var n = counts[w] || 0;
-        if (isThis){ cT[w] = (cT[w]||0)+n; totT += n; dayTot[d.d] = (dayTot[d.d]||0)+n; }
-        else { cL[w] = (cL[w]||0)+n; totL += n; }
-      });
-    });
-    var topHtml = rptTopWords(cT, 10, "Nothing recorded yet this week — counts appear after words are tapped on the connected device.");
-    var list = [];
-    for (var i=6; i>=0; i--){
-      var d0 = new Date(Date.now() - i*864e5);
-      list.push({ lb: "SMTWTFS"[d0.getDay()], n: dayTot[dkey(d0)] || 0 });
-    }
-    var days = rptDayBars(list);
-    var tHtml = rptTargets(cT, cL, function(tw){ return safeKey(tw.toLowerCase()); });
-    openOv('<h3>📊 Weekly report <span style="font-size:12px;color:var(--muted)">(from his device)</span></h3>' +
-      '<p class="sub">'+totT+' words spoken this week'+(totL ? ' ('+totL+' last week)' : '')+'</p>' +
-      '<label>Words per day</label><div style="display:flex;align-items:flex-end;gap:4px;height:74px">'+days+'</div>' +
-      '<label>Most used words</label>'+topHtml +
-      '<label>Target words</label>'+tHtml +
-      '<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="ntw" placeholder="Add a target word…" style="flex:1"><button class="btn primary" id="ntwa" style="flex:0 0 auto;padding:8px 14px">＋</button></div>' +
-      '<div class="btnrow"><button class="btn" id="rb">Back</button></div>');
-    Array.prototype.forEach.call(ovbox.querySelectorAll(".tdel"), function(bt){
-      bt.addEventListener("click", function(){
-        board.targets.splice(parseInt(bt.getAttribute("data-i"),10), 1); save(); remoteReport();
-      });
-    });
-    ovbox.querySelector("#ntwa").addEventListener("click", function(){
-      var v = ovbox.querySelector("#ntw").value.trim();
-      if (v && board.targets.indexOf(v) < 0){ board.targets.push(v); save(); remoteReport(); }
-    });
-    ovbox.querySelector("#rb").addEventListener("click", openSettings);
-  }).catch(function(){
-    openOv('<h3>📊 Weekly report</h3><p class="sub">Couldn’t reach the family data — check internet.</p><div class="btnrow"><button class="btn" id="rb">Back</button></div>');
-    ovbox.querySelector("#rb").addEventListener("click", openSettings);
-  });
-}
-
-/* ---------- detailed analytics ---------- */
-function deepReport(){
-  var log = getLog(), now = Date.now(), wk = 7*864e5;
-  var total = log.length;
-  var cAll = {}, cW = {}, firstSeen = {};
-  log.forEach(function(e){
-    var k = e.w.toLowerCase();
-    cAll[k] = (cAll[k]||0)+1;
-    if (e.t > now-wk) cW[k] = (cW[k]||0)+1;
-    if (!firstSeen[k] || e.t < firstSeen[k]) firstSeen[k] = e.t;
-  });
-  var uniqAll = Object.keys(cAll).length, uniqW = Object.keys(cW).length;
-  var newW = Object.keys(cW).filter(function(k){ return firstSeen[k] > now-wk; });
-  var days = {};
-  log.forEach(function(e){ var d = dkey(new Date(e.t)); days[d] = (days[d]||0)+1; });
-  var dayN = Object.keys(days).length || 1;
-  var avg = Math.round(total/dayN);
-  var hrs = [], hi;
-  for (hi = 0; hi < 12; hi++) hrs.push(0);
-  log.forEach(function(e){ hrs[Math.floor(new Date(e.t).getHours()/2)]++; });
-  var maxH = Math.max.apply(null, hrs.concat([1]));
-  var hBars = hrs.map(function(n, i){
-    return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:70%;background:var(--accent);border-radius:3px 3px 0 0;height:'+Math.round(n/maxH*44)+'px"></div><div style="font-size:9px;color:var(--muted)">'+(i*2)+'</div></div>';
-  }).join("");
-  var topHtml = rptTopWords(cAll, 20, "No taps recorded on this device yet.");
-  var stat = rptStat;
-  openOv('<h3>🔎 Detailed report</h3><p class="sub">Everything this device recorded (last 60 days). Made for parents, teachers, and SLPs.</p>' +
-    '<div style="display:flex;gap:8px">'+stat(total,"total taps")+stat(uniqAll,"different words")+stat(avg,"taps / active day")+'</div>' +
-    '<div style="display:flex;gap:8px;margin-top:8px">'+stat(uniqW,"words this week")+stat(newW.length,"new this week")+stat(dayN,"active days")+'</div>' +
-    (newW.length ? '<label>New words this week</label><div style="font-size:13px">'+newW.map(esc).join(", ")+'</div>' : '') +
-    '<label>Time of day (hour, all taps)</label><div style="display:flex;align-items:flex-end;gap:3px;height:62px">'+hBars+'</div>' +
-    '<label>Top 20 words (all time)</label>'+topHtml +
-    '<div class="btnrow"><button class="btn ghost" id="dcsv">⬇ Export CSV for specialists</button></div>' +
-    '<div class="btnrow"><button class="btn" id="drb">Back</button></div>');
-  ovbox.querySelector("#drb").addEventListener("click", openReport);
-  ovbox.querySelector("#dcsv").addEventListener("click", function(){
-    var rows = ["word,timestamp"];
-    log.forEach(function(e){ rows.push('"' + String(e.w).replace(/"/g,'""') + '",' + new Date(e.t).toISOString()); });
-    var blob = new Blob([rows.join("\n")], { type: "text/csv" });
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "kite-usage-" + new Date().toISOString().slice(0,10) + ".csv";
-    document.body.appendChild(a); a.click(); a.remove();
-    toast("CSV exported.");
-  });
-}
-
-/* ---------- weekly report ---------- */
-function openReport(){
-  if (dev.role === "parent" && syncOn && db){ remoteReport(); return; }
-  var now = Date.now(), wk = 7*864e5;
-  var log = getLog();
-  var thisW = log.filter(function(e){ return e.t > now-wk; });
-  var lastW = log.filter(function(e){ return e.t <= now-wk && e.t > now-2*wk; });
-  function countBy(arr){
-    var m = {};
-    arr.forEach(function(e){ var k = e.w.toLowerCase(); m[k] = (m[k]||0)+1; });
-    return m;
-  }
-  var cT = countBy(thisW), cL = countBy(lastW);
-  var firstSeenAll = {};
-  log.forEach(function(e){ var k=e.w.toLowerCase(); if(!firstSeenAll[k]||e.t<firstSeenAll[k]) firstSeenAll[k]=e.t; });
-  var distinctW = Object.keys(cT).length;
-  var newWords = Object.keys(cT).filter(function(k){ return firstSeenAll[k] > now-wk; });
-  var adays = {}; thisW.forEach(function(e){ adays[dkey(new Date(e.t))]=1; });
-  var activeDays = Object.keys(adays).length;
-  var growthPct = lastW.length ? Math.round((thisW.length-lastW.length)/lastW.length*100) : null;
-  var gstat = rptStat;
-  var topHtml = rptTopWords(cT, 10, "No taps recorded yet this week.");
-  var dlist = [];
-  for (var i=6; i>=0; i--){
-    var d0 = new Date(); d0.setHours(0,0,0,0); d0 = d0.getTime() - i*864e5;
-    var n = log.filter(function(e){ return e.t >= d0 && e.t < d0+864e5; }).length;
-    dlist.push({ lb: "SMTWTFS"[new Date(d0).getDay()], n: n });
-  }
-  var days = rptDayBars(dlist);
-  var tHtml = rptTargets(cT, cL);
-  openOv('<h3>📊 Weekly report</h3>' +
-    '<div class="btnrow" style="margin-top:0"><button class="btn ghost" id="deepb">🔎 Detailed report &amp; CSV export</button></div>' +
-    '<p class="sub">'+thisW.length+' words spoken this week'+(lastW.length?' (' + lastW.length + ' last week)':'')+'</p>' +
-    '<label>Communication growth</label>' +
-    '<div style="display:flex;gap:8px">'+gstat(distinctW,"different words")+gstat(newWords.length,"new this week")+gstat(activeDays,"active days")+'</div>' +
-    (newWords.length?'<div style="font-size:13px;margin-top:6px">🌱 New words this week: <b>'+newWords.slice(0,12).map(esc).join(", ")+'</b></div>':'') +
-    (growthPct!==null?'<div style="font-size:13px;margin-top:4px;color:'+(growthPct>=0?'var(--good)':'var(--muted)')+'">'+(growthPct>=0?'▲ '+growthPct+'% more than last week':'every week looks different — keep modeling')+'</div>':'') +
-    '<label>Words per day</label><div style="display:flex;align-items:flex-end;gap:4px;height:74px">'+days+'</div>' +
-    '<label>Most used words</label>'+topHtml +
-    '<label>Target words</label>'+tHtml +
-    '<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="ntw" placeholder="Add a target word…" style="flex:1"><button class="btn primary" id="ntwa" style="flex:0 0 auto;padding:8px 14px">＋</button></div>' +
-    '<div class="btnrow"><button class="btn" id="rb">Back</button></div>');
-  Array.prototype.forEach.call(ovbox.querySelectorAll(".tdel"), function(bt){
-    bt.addEventListener("click", function(){
-      board.targets.splice(parseInt(bt.getAttribute("data-i"),10), 1); save(); openReport();
-    });
-  });
-  ovbox.querySelector("#ntwa").addEventListener("click", function(){
-    var v = ovbox.querySelector("#ntw").value.trim();
-    if (v && board.targets.indexOf(v) < 0){ board.targets.push(v); save(); openReport(); }
-  });
-  var db = ovbox.querySelector("#deepb");
-  if (db) db.addEventListener("click", deepReport);
-  ovbox.querySelector("#rb").addEventListener("click", openSettings);
 }
 
 /* ---------- word index + guided path (used by Word Finder) ---------- */
@@ -2039,7 +1869,6 @@ function openSettings(){
       }).join("") +
     '</div>' +
     '<div class="note">Levels show more or less of the same board. Switching never deletes or moves anything. Set on each device — the parent phone can stay on Level 3 for editing.</div>' +
-    '<button class="btn ghost" id="rep" style="width:100%;margin-top:6px">📊 Weekly report &amp; target words</button>' +
     '<button class="btn ghost" id="syncb" style="width:100%;margin-top:6px">☁ Phone sync '+(syncOn ? "· connected ✓" : "· set up")+'</button>' +
     '<label>Voice</label><select id="vv">'+vopts+'</select>' +
     '<div class="note">Tip: on iPad, download a free “Enhanced” voice in Settings → Accessibility → Spoken Content → Voices for a much more natural child voice — it will appear in this list.</div>' +
@@ -2076,7 +1905,6 @@ function openSettings(){
   Array.prototype.forEach.call(ovbox.querySelectorAll("#lvpick button"), function(bt){
     bt.addEventListener("click", function(){ setLevel(parseInt(bt.getAttribute("data-lv"),10)); openSettings(); });
   });
-  ovbox.querySelector("#rep").addEventListener("click", openReport);
   ovbox.querySelector("#syncb").addEventListener("click", openSyncDlg);
   ovbox.querySelector("#vv").addEventListener("change", function(){ board.settings.voice = this.value; save(); });
   ovbox.querySelector("#sp").addEventListener("input", function(){ board.settings.pitch = parseFloat(this.value); ovbox.querySelector("#pvv").textContent = board.settings.pitch.toFixed(1); save(); });
@@ -2112,7 +1940,7 @@ function resetMenu(){
   openOv('<h3>Reset board</h3><p class="sub">This replaces everything on this device with a fresh starter board. Export a backup first if unsure.</p>' +
     '<button class="btn ghost" id="r2" style="width:100%">Load clean starter board</button>' +
     '<div class="btnrow"><button class="btn" id="rc">Cancel</button></div>');
-  ovbox.querySelector("#r2").addEventListener("click", function(){ board = starterBoard(); ensureShape(); save(); cur="home"; stack=[]; sent=[]; renderSent(); render(); closeOv(); toast("Loaded starter board."); });
+  ovbox.querySelector("#r2").addEventListener("click", function(){ board = starterBoard(); ensureShape(); save(); cur="home"; stack=[]; sent=[]; renderSent(); render(); closeOv(); toast("Loaded starter board."); setTimeout(autoSymbols, 300); });
   ovbox.querySelector("#rc").addEventListener("click", openSettings);
 }
 function exportBoard(){
@@ -2131,7 +1959,7 @@ document.getElementById("importIn").addEventListener("change", function(){
     try {
       var nb = JSON.parse(fr.result);
       if (!nb || !nb.pages || !nb.pages.home) throw 0;
-      board = nb; ensureShape(); save(); cur="home"; stack=[]; sent=[]; renderSent(); render(); closeOv();
+      board = nb; ensureShape(); save(); cur="home"; stack=[]; sent=[]; renderSent(); render(); closeOv(); setTimeout(autoSymbols, 300);
       toast("Board imported.");
     } catch(e){ toast("That file isn’t a TalkBoard backup."); }
   };
@@ -2140,6 +1968,8 @@ document.getElementById("importIn").addEventListener("change", function(){
 
 /* ---------- init: open durable store, restore if needed, then start ---------- */
 function startApp(){
+  try { localStorage.removeItem("kite2_log"); } catch(e){}
+  try { idbSet("kite2_log", ""); } catch(e){}
   loadDev();
   applyTheme();
   load();
@@ -2147,6 +1977,7 @@ function startApp(){
   cur = startPage();
   renderSent();
   render();
+  setTimeout(autoSymbols, 600);
   if (dev.fb && dev.code){
     setStatus("Connecting…");
     initFirebase(function(err){
@@ -2167,11 +1998,8 @@ idbOpen(function(){
     if (vb){ try { localStorage.setItem(LS_KEY, vb); } catch(e){} }
     idbGet(DEV_KEY, function(vd){
       if (vd){ try { if (!localStorage.getItem(DEV_KEY)) localStorage.setItem(DEV_KEY, vd); } catch(e){} }
-      idbGet(LOG_KEY, function(vl){
-        if (vl){ try { if (!localStorage.getItem(LOG_KEY)) localStorage.setItem(LOG_KEY, vl); } catch(e){} }
-        startApp();
-        if (vb) toast("Board restored from backup storage ✓");
-      });
+      startApp();
+      if (vb) toast("Board restored from backup storage ✓");
     });
   });
 });
