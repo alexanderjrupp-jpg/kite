@@ -230,9 +230,6 @@
   <div id="botbar">
     <button id="edit">🔒 Edit</button>
     <button id="pbuild" style="display:none">🪄 Page builder</button>
-    <button id="storiesBtn">📖 Stories</button>
-    <button id="gameBtn">🎲 Play</button>
-    <button id="routBtn">🧭 Routines</button>
     <div style="flex:1"></div>
     <span id="syncst" style="font-size:11px;color:var(--good);margin-right:8px"></span>
     <div style="font-size:11px;color:var(--muted)">Symbols © ARASAAC (CC BY-NC-SA), Gov. of Aragón</div>
@@ -266,7 +263,7 @@ window.onerror = function(msg, src, line){
      [EDIT]       button editor, drag-and-drop
      [SYMBOLS]    ARASAAC search + bulk
      [PAGES]      page builder
-     [PRACTICE]   word finder, routines, stories, game
+     [PRACTICE]   word finder
      [REPORTS]    weekly / detailed / remote + shared UI
      [SETTINGS]   settings dialog
      [SYNC]       Firebase board sync, accounts
@@ -370,39 +367,6 @@ function starterBoard(){
   };
 }
 
-/* ---------- daily parent prompts ---------- */
-var TIPS = [
-  "Model “more” at snack time — tap it on his board every time you give him more.",
-  "What made him laugh today? Add a word for it while it’s fresh.",
-  "Narrate with 2-word phrases as you tap: “go fast”, “big truck”, “want juice”.",
-  "After you ask a question, silently count to 10. Wait time is thinking time.",
-  "Add one person he saw today who isn’t on the Family page yet.",
-  "Model “help” before he gets frustrated — tap it as you help him.",
-  "Tap “finished” together every time an activity ends today.",
-  "Is there a food he asked for this week that isn’t on the board? Add it.",
-  "Model feelings when YOU feel them: “mom happy”, “dad tired”.",
-  "Respond to every button press like it’s talking — because it is.",
-  "Add a word for his current favorite show, toy, or song.",
-  "Model “stop” and “go” during play — cars, tickles, swings.",
-  "Try commenting, not quizzing: instead of “what’s this?”, tap “I see dog”.",
-  "Add a place you’re going this week so you can talk about it before you go.",
-  "Model “not” + a word: “not sleepy”, “not that one”.",
-  "Pick one target word this week and tap it 20 times a day in real moments.",
-  "Let him see YOU use the board to talk to someone else today.",
-  "Add a silly word — kids use devices more when they can joke with them.",
-  "Model “want” + spelling a word with SPELL for something not on the board.",
-  "Revisit the Feelings page after a big moment, good or bad.",
-  "Add tomorrow’s plan as words tonight: who, where, what.",
-  "Model two-word combos from words he already knows single: “more juice”, “go outside”.",
-  "Check the weekly report: which top word can you build on with a new pairing?",
-  "Say it out loud as you tap — voice + button together builds the link."
-];
-function todayTip(){
-  var d = new Date();
-  var doy = Math.floor((d - new Date(d.getFullYear(),0,0)) / 864e5);
-  return TIPS[doy % TIPS.length];
-}
-
 /* ---------- topic word packs (offline page builder) ---------- */
 var TOPICS = {
   "Dentist":  [["dentist","🦷"],["teeth","🦷"],["open","😮"],["brush","🪥"],["chair","🪑"],["rinse","💦"],["wait","⏳"],["all done","✔️"],["scared","😱"],["brave","💪"]],
@@ -422,22 +386,6 @@ var LOG_KEY = "kite2_log";
 function getLog(){
   try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch(e){ return []; }
 }
-function markMilestone(key, msg, say){
-  if (!board.milestones) board.milestones = {};
-  if (board.milestones[key]) return false;
-  board.milestones[key] = Date.now(); save();
-  toast("🎉 " + msg);
-  return true;
-}
-function checkWordMilestones(){
-  var d = {}; getLog().forEach(function(e){ d[e.w.toLowerCase()] = 1; });
-  var n = Object.keys(d).length, tiers = [10,25,50,100,200,300];
-  for (var i=0;i<tiers.length;i++){
-    if (n >= tiers[i] && !(board.milestones && board.milestones["words"+tiers[i]])){
-      markMilestone("words"+tiers[i], tiers[i]+" different words used! 🌟", "Wow! "+tiers[i]+" words!"); break;
-    }
-  }
-}
 function logWord(w){
   try {
     var lg = getLog();
@@ -451,7 +399,6 @@ function logWord(w){
     idbSet(LOG_KEY, lj);
   } catch(e){}
   queueUsage(w);
-  try { checkWordMilestones(); } catch(e){}
 }
 
 /* ---------- durable storage mirror (IndexedDB survives iOS cache cleanups) ---------- */
@@ -496,18 +443,14 @@ function load(){
 }
 function ensureShape(){
   if (!board.targets) board.targets = [];
-  if (!board.milestones) board.milestones = {};
   if (!board.settings) board.settings = { voice:"", rate:1, pitch:1, instant:true };
   if (!board.settings.size) board.settings.size = "fit";
   if (board.settings.hold === undefined) board.settings.hold = 0;
-  if (!board.stories) board.stories = [];
-  if (board.settings.storyPrompts === undefined) board.settings.storyPrompts = true;
   if (board.settings.vol === undefined) board.settings.vol = 1;
   if (board.settings.volMax === undefined) board.settings.volMax = 1;
   if (board.settings.volMin === undefined) board.settings.volMin = 0.15;
   if (!board.settings.kbLayout) board.settings.kbLayout = "qwerty";
   if (board.settings.motorReturn === undefined) board.settings.motorReturn = false;
-  if (!board.settings.routineLevel) board.settings.routineLevel = 1;
   if (!board.fspFix){
     Object.keys(board.pages).forEach(function(pk){
       var cs = board.pages[pk].cells;
@@ -787,7 +730,7 @@ function renderSent(){
 }
 
 document.getElementById("spk").addEventListener("click", function(){
-  if (sent.length){ playItems(sent); if (sent.length >= 2) markMilestone("firstCombo", "First time combining words! 🌟", "You put words together!"); }
+  if (sent.length){ playItems(sent); }
 });
 document.getElementById("clr").addEventListener("click", function(){ sent=[]; renderSent(); });
 document.getElementById("bsp").addEventListener("click", function(){ sent.pop(); renderSent(); });
@@ -934,8 +877,6 @@ editBtn.addEventListener("click", function(){
         '<div class="btnrow"><button class="btn" id="nsl">Later</button><button class="btn primary" id="nsy">Get symbols</button></div>');
       ovbox.querySelector("#nsl").addEventListener("click", closeOv);
       ovbox.querySelector("#nsy").addEventListener("click", function(){ closeOv(); bulkSymbols(); });
-    } else {
-      toast("💡 " + todayTip());
     }
   }
   if (dev.role === "parent") unlock();      /* parent’s own phone — no PIN needed */
@@ -1918,7 +1859,7 @@ function openReport(){
   ovbox.querySelector("#rb").addEventListener("click", openSettings);
 }
 
-/* ---------- read-along stories ---------- */
+/* ---------- word index + guided path (used by Word Finder) ---------- */
 function wordIndex(){
   var ix = {};
   Object.keys(board.pages).forEach(function(pk){
@@ -1934,95 +1875,7 @@ function wordIndex(){
   return ix;
 }
 function tokenKey(t){ return t.toLowerCase().replace(/[^a-z0-9''-]/g,""); }
-document.getElementById("storiesBtn").addEventListener("click", openStories);
-document.getElementById("routBtn").addEventListener("click", openCoach);
-function openStories(){
-  var canEdit = editing || dev.role === "parent";
-  var list = (board.stories || []).map(function(s, i){
-    return '<div style="display:flex;align-items:center;gap:6px;margin:6px 0">' +
-      '<button class="btn ghost sopen" data-i="'+i+'" style="flex:1;text-align:left">📖 '+esc(s.title)+'</button>' +
-      (canEdit ? '<button class="btn ghost sedit" data-i="'+i+'" style="flex:0 0 auto;padding:8px 12px">✎</button><button class="btn ghost sdel" data-i="'+i+'" style="flex:0 0 auto;padding:8px 12px">✕</button>' : '') +
-      '</div>';
-  }).join("") || '<div class="note">No stories or songs yet.'+(canEdit ? '' : ' Ask a grown-up to add one!')+'</div>';
-  openOv('<h3>📖 Stories &amp; Songs</h3><p class="sub">Read along or sing along — tap the glowing word! Great for favorite books, songs, and nursery rhymes.</p>' + list +
-    (canEdit ? '<div class="btnrow"><button class="btn primary" id="snew">＋ New story or song</button></div>' : '') +
-    '<div class="btnrow"><button class="btn" id="sc">Close</button></div>');
-  Array.prototype.forEach.call(ovbox.querySelectorAll(".sopen"), function(bt){
-    bt.addEventListener("click", function(){ playStory(board.stories[parseInt(bt.getAttribute("data-i"),10)]); });
-  });
-  Array.prototype.forEach.call(ovbox.querySelectorAll(".sedit"), function(bt){
-    bt.addEventListener("click", function(){ editStory(parseInt(bt.getAttribute("data-i"),10)); });
-  });
-  Array.prototype.forEach.call(ovbox.querySelectorAll(".sdel"), function(bt){
-    bt.addEventListener("click", function(){
-      board.stories.splice(parseInt(bt.getAttribute("data-i"),10), 1); save(); openStories();
-    });
-  });
-  var sn = ovbox.querySelector("#snew");
-  if (sn) sn.addEventListener("click", function(){ editStory(null); });
-  ovbox.querySelector("#sc").addEventListener("click", closeOv);
-}
-function editStory(i){
-  var s = (i !== null && i !== undefined) ? board.stories[i] : { title:"", text:"" };
-  openOv('<h3>'+((i!==null && i!==undefined)?"Edit":"New")+' story</h3>' +
-    '<label>Title</label><input type="text" id="stt" value="'+esc(s.title)+'" placeholder="e.g. Our trip to the zoo">' +
-    '<label>Story text</label><textarea id="stx" rows="5" placeholder="We went to the zoo. We saw a big lion!">'+esc(s.text)+'</textarea>' +
-    '<div class="note">Each word becomes a tappable tile. Words that are on his board automatically get their picture, color, and recorded voice. Stories sync to all devices.</div>' +
-    '<div class="btnrow"><button class="btn" id="stc">Cancel</button><button class="btn primary" id="sts">Save</button></div>');
-  ovbox.querySelector("#stc").addEventListener("click", openStories);
-  ovbox.querySelector("#sts").addEventListener("click", function(){
-    var t = ovbox.querySelector("#stt").value.trim(), x = ovbox.querySelector("#stx").value.trim();
-    if (!t || !x){ toast("Give the story a title and some text."); return; }
-    if (i !== null && i !== undefined) board.stories[i] = { title:t, text:x };
-    else board.stories.push({ title:t, text:x });
-    save(); storyMissing(x);
-  });
-}
-/* after saving a story: offer to add words that are not on the board yet */
-function storyMissing(text){
-  var ix = wordIndex();
-  var seen = {}, missing = [];
-  text.split(/\s+/).forEach(function(t){
-    var k = tokenKey(t);
-    if (k && !ix[k] && !seen[k]){ seen[k] = 1; missing.push(k); }
-  });
-  if (!missing.length){ openStories(); return; }
-  var destOpts = Object.keys(board.pages).map(function(k){
-    return '<option value="'+k+'">'+esc(board.pages[k].name)+'</option>';
-  }).join("");
-  openOv('<h3>Words not on his board yet</h3><p class="sub">Skipped words are simply read aloud during the story. Or make them real buttons — tap a word to keep or skip it, then pick a page. They fill empty slots only.</p>' +
-    '<div id="mwlist" style="display:flex;gap:6px;flex-wrap:wrap"></div>' +
-    '<label>Add them to…</label><select id="mwdest">'+destOpts+'</select>' +
-    '<div class="btnrow"><button class="btn" id="mwskip">Skip all</button><button class="btn primary" id="mwadd">Add selected</button></div>');
-  var picked = missing.map(function(w){ return { w:w, on:true }; });
-  function rw(){
-    var el = ovbox.querySelector("#mwlist"); el.innerHTML = "";
-    picked.forEach(function(p){
-      var bt = document.createElement("button");
-      bt.className = "btn ghost";
-      bt.style.cssText = "flex:0 0 auto;padding:7px 10px;font-size:13px" + (p.on ? "" : ";opacity:.35;text-decoration:line-through");
-      bt.textContent = p.w;
-      bt.addEventListener("click", function(){ p.on = !p.on; rw(); });
-      el.appendChild(bt);
-    });
-  }
-  rw();
-  ovbox.querySelector("#mwskip").addEventListener("click", openStories);
-  ovbox.querySelector("#mwadd").addEventListener("click", function(){
-    var dest = ovbox.querySelector("#mwdest").value, at = 0, added = 0;
-    picked.forEach(function(p){
-      if (!p.on) return;
-      var idx = firstEmpty(dest, at);
-      if (idx < 0) return;
-      board.pages[dest].cells[idx] = W(p.w, "⬜");
-      at = idx + 1; added++;
-    });
-    save();
-    toast(added + " added to “" + board.pages[dest].name + "” — Settings → Get real symbols will picture them.");
-    openStories();
-  });
-}
-/* guided read-along: lights the real path on the board (eat -> Fruit -> kiwi) */
+/* guided path: lights the real path on the board (Food -> apple) */
 var guide = null;
 function bfsPath(wordKey){
   var prev = { home: null }, q = ["home"];
@@ -2049,17 +1902,11 @@ function bfsPath(wordKey){
   }
   return null;
 }
-function playStory(s){
-  closeOv();
-  cur = "home"; stack = [];
-  guide = { title: s.title, toks: s.text.split(/\s+/).filter(Boolean), pos: -1, path: null };
-  advanceGuide();
-}
 function updateGuideBar(){
   var gb = document.getElementById("guidebar");
   if (!guide){ gb.style.display = "none"; gb.innerHTML = ""; return; }
   gb.style.display = "flex";
-  gb.innerHTML = '📖 <span>' + esc(guide.title) + '</span>&nbsp;·&nbsp;find: <span class="gword">' + esc(guide.toks[guide.pos]) + '</span>' +
+  gb.innerHTML = '🔍 <span>' + esc(guide.title) + '</span>&nbsp;·&nbsp;find: <span class="gword">' + esc(guide.toks[guide.pos]) + '</span>' +
     '<span style="color:var(--muted)">' + (guide.pos + 1) + ' / ' + guide.toks.length + '</span>' +
     '<button id="gstopb">✕ Stop</button>';
   document.getElementById("gstopb").addEventListener("click", endGuide);
@@ -2087,7 +1934,7 @@ function advanceGuide(){
   var leadTxt = lead.join(" ");
   setTimeout(function(){
     if (!guide) return;
-    var pr = board.settings.storyPrompts !== false;
+    var pr = true;
     if (leadTxt) speakAsync(leadTxt, function(){ if (guide && pr) speak("Find " + guide.toks[guide.pos]); });
     else if (pr) speak("Find " + guide.toks[guide.pos]);
   }, 1500);
@@ -2095,14 +1942,8 @@ function advanceGuide(){
   render();
 }
 function finishGuide(){
-  var wf = guide && guide.wf;
-  var rt = guide && guide.rt;
   guide = null; updateGuideBar(); render();
-  if (wf){ toast("🎉 Found it!"); speak("You found it!"); return; }
-  if (rt){ openOv('<h3>🎉 Routine done!</h3><div style="text-align:center;font-size:42px;margin:10px 0">🌟 🎉 🌟</div><p class="sub" style="text-align:center;font-size:15px">You practiced every word — great talking!</p><div class="btnrow"><button class="btn primary" id="stdone">Done</button></div>'); setTimeout(function(){ speak("Great talking!"); }, 1200); ovbox.querySelector("#stdone").addEventListener("click", closeOv); return; }
-  openOv('<h3>📖 The end!</h3><div style="text-align:center;font-size:42px;margin:10px 0">🎉 ⭐ 🎉</div><p class="sub" style="text-align:center;font-size:15px">Great reading!</p><div class="btnrow"><button class="btn primary" id="stdone">Done</button></div>');
-  setTimeout(function(){ speak("The end! Great reading!"); }, 1200);
-  ovbox.querySelector("#stdone").addEventListener("click", closeOv);
+  toast("🎉 Found it!"); speak("You found it!");
 }
 function guideGlow(){
   var hb = document.getElementById("homeBtn");
@@ -2227,160 +2068,6 @@ function printBoard(){
   setTimeout(function(){ try { w.print(); } catch(e){} }, 700);
 }
 
-/* ---------- Find it! game ---------- */
-var GK = "tb_stars";
-function getStars(){ try { return parseInt(localStorage.getItem(GK),10) || 0; } catch(e){ return 0; } }
-function addStar(){ try { localStorage.setItem(GK, String(getStars()+1)); } catch(e){} }
-var gStreak = 0, gCount = 4;
-function gamePool(){
-  var ix = wordIndex();
-  return Object.keys(ix).map(function(k){ return ix[k]; }).filter(function(b){
-    return (b.img && (b.img.d || b.img.u)) || (b.e && b.e !== "⬜" && b.e !== "");
-  });
-}
-document.getElementById("gameBtn").addEventListener("click", openGame);
-function openGame(){
-  gStreak = 0; gCount = 4;
-  openOv('<h3>🎲 Find it!</h3><p class="sub">Listen, then tap the right picture. You have ⭐ '+getStars()+' stars!</p>' +
-    '<div class="btnrow"><button class="btn primary" id="ggo">▶ Play</button><button class="btn" id="gc">Close</button></div>');
-  ovbox.querySelector("#ggo").addEventListener("click", gameRound);
-  ovbox.querySelector("#gc").addEventListener("click", closeOv);
-}
-function gameRound(){
-  var pool = gamePool();
-  if (pool.length < 4){ toast("Add a few more picture buttons to play."); closeOv(); return; }
-  var target = null;
-  if (board.targets.length && Math.random() < 0.4){
-    var tset = board.targets.map(function(t){ return t.toLowerCase(); });
-    var hits = pool.filter(function(b){ return tset.indexOf(b.l.toLowerCase()) >= 0; });
-    if (hits.length) target = hits[Math.floor(Math.random()*hits.length)];
-  }
-  if (!target) target = pool[Math.floor(Math.random()*pool.length)];
-  var opts = [target], guard = 0;
-  while (opts.length < Math.min(gCount, pool.length) && guard++ < 300){
-    var c = pool[Math.floor(Math.random()*pool.length)];
-    if (!opts.some(function(o){ return o.l === c.l; })) opts.push(c);
-  }
-  for (var i = opts.length-1; i > 0; i--){
-    var j = Math.floor(Math.random()*(i+1));
-    var tmp = opts[i]; opts[i] = opts[j]; opts[j] = tmp;
-  }
-  var colsN = opts.length <= 4 ? 2 : 3;
-  var tiles = opts.map(function(b){
-    var pc = palColors(b.c);
-    var pic = (b.img && (b.img.d || b.img.u))
-      ? '<img src="'+(b.img.d || b.img.u)+'" style="max-width:72%;max-height:66%;object-fit:contain" alt="">'
-      : '<span style="font-size:42px">'+(b.e||"")+'</span>';
-    return '<button class="gtile" data-l="'+esc(b.l)+'" style="background:'+pc[0]+';--edge:'+pc[1]+'">'+pic+'</button>';
-  }).join("");
-  openOv('<h3>🎲 Find it! <span style="float:right;font-size:14px;font-weight:600">⭐ '+getStars()+'</span></h3>' +
-    '<div style="display:flex;align-items:center;gap:8px;margin:6px 0">' +
-      '<button class="btn ghost" id="ghear" style="flex:0 0 auto;padding:8px 14px">🔊</button>' +
-      '<div style="font-size:19px;font-weight:700">Find: '+esc(target.l)+'</div></div>' +
-    '<div style="display:grid;grid-template-columns:repeat('+colsN+',1fr);gap:10px">'+tiles+'</div>' +
-    '<div class="btnrow"><button class="btn" id="gstop">Done playing</button></div>');
-  function say(){ speak("Find " + target.l); }
-  say();
-  ovbox.querySelector("#ghear").addEventListener("click", say);
-  ovbox.querySelector("#gstop").addEventListener("click", closeOv);
-  var solved = false;
-  Array.prototype.forEach.call(ovbox.querySelectorAll(".gtile"), function(bt){
-    bt.addEventListener("click", function(){
-      if (solved) return;
-      if (bt.getAttribute("data-l") === target.l){
-        solved = true;
-        addStar(); gStreak++;
-        if (gStreak === 3 && gCount < 6) gCount = 6;
-        else if (gStreak === 6 && gCount < 9) gCount = 9;
-        bt.style.outline = "4px solid var(--good)";
-        bt.style.transform = "scale(1.06)";
-        speak("Yes! " + target.l + "!");
-        setTimeout(gameRound, 1100);
-      } else {
-        gStreak = 0;
-        bt.style.opacity = .3;
-        say();
-      }
-    });
-  });
-}
-
-/* ---------- Model With Me: routine coach ---------- */
-var ROUTINES = [
-  { n:"Bedtime", e:"🌙", w:["tired","read","more","goodnight"], p:"read more",
-    lv:["tired read more goodnight","I tired read more goodnight now","I am tired let's read more time to say goodnight"],
-    t:"While tucking in, tap each word and say it. Read a page, model read more, then wait." },
-  { n:"Snack time", e:"🍎", w:["eat","more","want","finished"], p:"want more",
-    lv:["eat more want finished","I want eat more all finished","I want to eat I want more I am all finished"],
-    t:"Hold the snack, model eat. Give a little. Model more before handing over more. Tap finished at the end." },
-  { n:"Mealtime", e:"🍽️", w:["eat","drink","more","finished"], p:"more drink",
-    lv:["eat drink more finished","I eat I drink more please finished","I want to eat I want a drink more please I am finished"],
-    t:"Narrate the meal: eat, drink. Offer two choices and model both words before he picks." },
-  { n:"Bath time", e:"🛁", w:["water","in","help","finished"], p:"in water",
-    lv:["water in help finished","in the water help me all finished","I get in the water help me please I am all finished"],
-    t:"Model in as each toy goes in the tub. Splash and comment — bath talk is play, not testing." },
-  { n:"Car ride", e:"🚗", w:["go","stop","fast","look"], p:"go fast",
-    lv:["go stop fast look","go fast please stop look there","let's go fast please stop look over there"],
-    t:"Model go when the light changes, stop at stop signs. Point out the window and tap look." },
-  { n:"Playground", e:"🌳", w:["play","up","down","more"], p:"up more",
-    lv:["play up down more","I play go up go down more please","I want to play go up high go down more turn please"],
-    t:"Model up as the swing rises, down on the slide. One word per push — rhythm builds words." },
-  { n:"School pickup", e:"🎒", w:["happy","school","what","do"], p:"what do",
-    lv:["happy school what do","I happy at school what you do","I am happy at school what did you do today"],
-    t:"Instead of quizzing, model your own day: I do work. I happy. Then wait." },
-  { n:"Morning", e:"🌞", w:["up","wear","eat","go"], p:"wear this",
-    lv:["up wear eat go","get up wear this eat now go outside","time to get up I wear this I eat breakfast let's go"],
-    t:"Model up at wake-up, wear while offering two shirts, go heading out the door." },
-  { n:"Feelings check", e:"🎭", w:["feel","happy","sad","mad"], p:"I feel happy",
-    lv:["feel happy sad mad","I feel happy I feel sad I feel mad","I feel happy today are you sad why are you mad"],
-    t:"Model YOUR feelings first: I feel tired. Kids learn feeling words by hearing them used honestly." },
-  { n:"Play time", e:"🎲", w:["play","want","more","stop"], p:"play more",
-    lv:["play want more stop","I want play more please stop now","I want to play more turn please stop now"],
-    t:"Follow his lead. Model more before restarting a game he loves. Model stop and actually stop." }
-];
-function openCoach(){
-  var chips = ROUTINES.map(function(r, i){
-    return '<button class="btn ghost rch" data-i="'+i+'" style="flex:0 0 auto;padding:10px 12px;font-size:14px">'+r.e+' '+esc(r.n)+'</button>';
-  }).join("");
-  openOv('<h3>🧭 Model With Me</h3><p class="sub">Pick a routine — you get 3\u20134 words to model and a simple script. Modeling means YOU tap and talk. No quizzing, no pressure.</p>' +
-    '<div style="display:flex;flex-wrap:wrap;gap:8px">'+chips+'</div>' +
-    '<div class="btnrow"><button class="btn" id="cc">Close</button></div>');
-  Array.prototype.forEach.call(ovbox.querySelectorAll(".rch"), function(bt){
-    bt.addEventListener("click", function(){ coachDetail(ROUTINES[parseInt(bt.getAttribute("data-i"),10)]); });
-  });
-  ovbox.querySelector("#cc").addEventListener("click", openSettings);
-}
-function coachDetail(r){
-  var lvl = board.settings.routineLevel || 1;
-  var lvlName = ["Single words","Short phrases","Sentences"][lvl-1];
-  var toks = routineToks(r);
-  var ix = wordIndex();
-  var chips = toks.map(function(w){
-    var b = ix[w.toLowerCase()];
-    if (b){ var pc = palColors(b.c); return '<span style="border-radius:10px;padding:6px 10px;font-size:15px;font-weight:700;color:var(--text);background:'+pc[0]+';box-shadow:0 2px 0 '+pc[1]+'">'+(b.e && b.e!=="⬜" ? b.e+" " : "")+esc(w)+'</span>'; }
-    return '<span style="padding:6px 10px;font-size:15px;color:var(--muted)">'+esc(w)+'</span>';
-  }).join(" ");
-  openOv('<h3>'+r.e+' '+esc(r.n)+' <span style="font-size:12px;color:var(--muted);font-weight:600">· '+lvlName+'</span></h3>' +
-    '<label>Tap Start, then follow the glow through every word — do the whole routine</label>' +
-    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;align-items:center">'+chips+'</div>' +
-    '<label>Try this</label><div style="font-size:15px;background:var(--tipbg);border:1px solid var(--tipborder);border-radius:12px;padding:10px 12px">'+esc(r.t)+'</div>' +
-    '<div class="note">Set the level (single words → phrases → sentences) in Settings. Golden rules: model without expecting anything back · wait 10 seconds · respond to every tap like it is talking.</div>' +
-    '<div class="btnrow"><button class="btn" id="cb">← Routines</button><button class="btn primary" id="cstart">▶ Start</button></div>');
-  ovbox.querySelector("#cb").addEventListener("click", openCoach);
-  ovbox.querySelector("#cstart").addEventListener("click", function(){ startRoutine(r); });
-}
-function routineToks(r){
-  var lvl = board.settings.routineLevel || 1;
-  var txt = (r.lv && r.lv[lvl-1]) || r.w.join(" ");
-  return txt.split(/\s+/).filter(Boolean);
-}
-function startRoutine(r){
-  closeOv();
-  cur = "home"; stack = [];
-  guide = { title: r.n, toks: routineToks(r), pos: -1, path: null, rt: true };
-  advanceGuide();
-}
-
 /* ---------- settings ---------- */
 document.getElementById("setBtn").addEventListener("click", function(){
   askPin(openSettings);
@@ -2393,14 +2080,8 @@ function openSettings(){
     vopts += '<option value="'+esc(v.name)+'"'+(board.settings.voice===v.name?" selected":"")+'>'+esc(v.name)+' ('+esc(v.lang)+')</option>';
   });
   openOv('<h3>Settings</h3>' +
-    '<div style="background:var(--tipbg);border:1px solid var(--tipborder);border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:6px"><b>💡 Today’s idea:</b> '+esc(todayTip())+'</div>' +
     '<button class="btn ghost" id="rep" style="width:100%;margin-top:6px">📊 Weekly report &amp; target words</button>' +
     '<button class="btn ghost" id="syncb" style="width:100%;margin-top:6px">☁ Phone sync '+(syncOn ? "· connected ✓" : "· set up")+'</button>' +
-    '<button class="btn ghost" id="coachb" style="width:100%;margin-top:6px">🧭 Model With Me — routine coach</button>' +
-    '<label>Routine level — how routines build up</label><select id="rlv">' +
-      '<option value="1"'+((board.settings.routineLevel||1)===1?" selected":"")+'>Single words</option>' +
-      '<option value="2"'+(board.settings.routineLevel===2?" selected":"")+'>Short phrases</option>' +
-      '<option value="3"'+(board.settings.routineLevel===3?" selected":"")+'>Sentences</option></select>' +
     '<label>Voice</label><select id="vv">'+vopts+'</select>' +
     '<div class="note">Tip: on iPad, download a free “Enhanced” voice in Settings → Accessibility → Spoken Content → Voices for a much more natural child voice — it will appear in this list.</div>' +
     '<label>Voice pitch: <span id="pvv">'+board.settings.pitch.toFixed(1)+'</span> (higher = younger)</label>' +
@@ -2408,7 +2089,6 @@ function openSettings(){
     '<label>Speaking speed: <span id="rvv">'+board.settings.rate.toFixed(1)+'</span>×</label>' +
     '<input type="range" id="sr" min="0.5" max="1.4" step="0.1" value="'+board.settings.rate+'">' +
     '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="si"'+(board.settings.instant?" checked":"")+' style="width:auto"> Speak each word when tapped</label>' +
-    '<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="sgp"'+(board.settings.storyPrompts!==false?" checked":"")+' style="width:auto"> Story voice prompts (“Find …”) — the glow always stays on</label>' +
     '<label>Button size</label><select id="bsz">' +
       '<option value="fit"'+(board.settings.size==="fit"?" selected":"")+'>Fit screen (whole board visible — like LAMP)</option>' +
       '<option value="large"'+(board.settings.size==="large"?" selected":"")+'>Large (bigger targets, board scrolls)</option>' +
@@ -2436,13 +2116,10 @@ function openSettings(){
     '<div class="btnrow"><button class="btn primary" id="sd">Done</button></div>');
   ovbox.querySelector("#rep").addEventListener("click", openReport);
   ovbox.querySelector("#syncb").addEventListener("click", openSyncDlg);
-  ovbox.querySelector("#coachb").addEventListener("click", openCoach);
-  ovbox.querySelector("#rlv").addEventListener("change", function(){ board.settings.routineLevel = parseInt(this.value,10); save(); });
   ovbox.querySelector("#vv").addEventListener("change", function(){ board.settings.voice = this.value; save(); });
   ovbox.querySelector("#sp").addEventListener("input", function(){ board.settings.pitch = parseFloat(this.value); ovbox.querySelector("#pvv").textContent = board.settings.pitch.toFixed(1); save(); });
   ovbox.querySelector("#sr").addEventListener("input", function(){ board.settings.rate = parseFloat(this.value); ovbox.querySelector("#rvv").textContent = board.settings.rate.toFixed(1); save(); });
   ovbox.querySelector("#si").addEventListener("change", function(){ board.settings.instant = this.checked; save(); });
-  ovbox.querySelector("#sgp").addEventListener("change", function(){ board.settings.storyPrompts = this.checked; save(); });
   ovbox.querySelector("#bsz").addEventListener("change", function(){ board.settings.size = this.value; save(); render(); });
   ovbox.querySelector("#bhold").addEventListener("change", function(){ board.settings.hold = parseInt(this.value,10); save(); });
   ovbox.querySelector("#shc").addEventListener("change", function(){ dev.contrast = this.checked; saveDev(); applyTheme(); render(); });
